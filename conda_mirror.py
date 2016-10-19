@@ -52,7 +52,8 @@ def _make_arg_parser():
         '--platform',
         nargs="+",
         help=("The OS platform(s) to mirror. one or more of: {'all',"
-              " 'linux-64', 'linux-32', 'osx-64', 'win-32', 'win-64'}")
+              " 'linux-64', 'linux-32', 'osx-64', 'win-32', 'win-64'}"),
+        default=[],
     )
 
     return ap
