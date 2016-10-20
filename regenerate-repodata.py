@@ -5,8 +5,12 @@ import tempfile
 import shutil
 import glob
 import conda_mirror
+import sys
 
-REPO_NAME = "local-repo"
+if len(sys.argv) != 2:
+    print("Pass the target directory for the repo as the second argument")
+REPO_NAME = sys.argv[1]
+
 if os.path.exists(REPO_NAME):
     shutil.rmtree(REPO_NAME)
 

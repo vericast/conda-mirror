@@ -5,22 +5,22 @@
       "build": "0",
       "build_number": 0,
       "depends": [],
-      "md5": "1b9855f7da51e9f7b11197a96ff1a641",
+      "md5": "f4370baf7b95fae0a182da7df2320232",
       "name": "a",
       "sig": null,
-      "size": 1180,
-      "subdir": "linux-64",
+      "size": 1199,
+      "subdir": "linux-32",
       "version": "1"
     },
     "b-1-0.tar.bz2": {
       "build": "0",
       "build_number": 0,
       "depends": [],
-      "md5": "06704a6c639a569bf0ad68afc4f3258d",
+      "md5": "dc6f8e5aca3532cda43638b9b0f74db1",
       "name": "b",
       "sig": null,
-      "size": 1180,
-      "subdir": "linux-64",
+      "size": 1193,
+      "subdir": "linux-32",
       "version": "1"
     }
   }

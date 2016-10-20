@@ -1,0 +1,4 @@
+#!/bin/bash
+pip install -r test-requirements.txt
+coverage run --branch -m py.test -vrsx
+coverage report -m

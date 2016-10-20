@@ -1,30 +1,30 @@
 {
   "a-1-0.tar.bz2": {
-    "arch": "x86_64",
+    "arch": "x86",
     "build": "0",
     "build_number": 0,
     "depends": [],
-    "md5": "4302dac56120870e7078d66a5ae5973a",
-    "mtime": 1476987343.0913808,
+    "md5": "57379ed4d14848540723938648914604",
+    "mtime": 1476988968.8262193,
     "name": "a",
     "platform": "win",
     "sig": null,
     "size": 1200,
-    "subdir": "win-64",
+    "subdir": "win-32",
     "version": "1"
   },
   "b-1-0.tar.bz2": {
-    "arch": "x86_64",
+    "arch": "x86",
     "build": "0",
     "build_number": 0,
     "depends": [],
-    "md5": "86438380ec91a53ed83b316b869049cb",
-    "mtime": 1476987342.2997768,
+    "md5": "2a091f6efbf4e67de49a5e14d4b9f1b4",
+    "mtime": 1476988968.1465592,
     "name": "b",
     "platform": "win",
     "sig": null,
-    "size": 1200,
-    "subdir": "win-64",
+    "size": 1196,
+    "subdir": "win-32",
     "version": "1"
   }
 }
