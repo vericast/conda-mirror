@@ -13,4 +13,4 @@ script:
 - coverage run -m pytest -vrsx
 
 after_success:
-- codecov.io
+- codecov
