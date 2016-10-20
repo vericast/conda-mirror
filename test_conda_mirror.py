@@ -6,12 +6,18 @@ import subprocess
 import sys
 
 
-def test_regenerate_local_repo():
-    if os.path.exists('local-repo'):
-        raise pytest.skip("Don't need to regenerate repo. If you want to force "
-                          "regeneration, remove the 'local-repo' dir")
+def ensure_local_repo():
     print("Regenerating local repo")
     subprocess.check_call('python regenerate-repodata.py'.split())
+
+    ensure_local_repo()
+
+
+@pytest.mark.first
+def test_ensure_local_repo():
+    if os.path.exists('local-repo'):
+        pytest.skip("Don't need to regenerate repo. If you want to force "
+                    "regeneration, remove the 'local-repo' dir")
 
 
 @pytest.mark.parametrize('platform', conda_mirror.DEFAULT_PLATFORMS)
@@ -29,4 +35,5 @@ def test_get_repodata(platform):
 
         ret = conda_mirror.get_repodata(channel, platform)
         assert ret
+
 

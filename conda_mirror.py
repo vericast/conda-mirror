@@ -141,8 +141,6 @@ def main(upstream_channel, target_directory, platform):
                     f.write(data)
 
 
-
-
 if __name__ == "__main__":
     import sys
     if sys.version_info.major < 3:
