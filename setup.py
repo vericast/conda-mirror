@@ -9,5 +9,5 @@ setup(
     description='mirror an upstream conda channel to a local directory',
     url='http://bitbucket.maxpointinteractive.com/mf/conda-mirror',
     platforms='Cross platform (Linux, Mac OSX, Windows)',
-    license='Maxpoint Proprietary'
+    license='BSD 3-Clause',
 )
