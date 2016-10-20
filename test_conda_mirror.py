@@ -4,6 +4,8 @@ import requests_mock
 import os
 import subprocess
 from contextlib import contextmanager
+import json
+import shutil
 
 @pytest.fixture(scope='session')
 def local_repo_root():
@@ -28,20 +30,56 @@ def conda_mock(platform, repo):
     with requests_mock.mock() as m:
         repodata = os.path.join(repo, platform, 'repodata.json')
         with open(repodata, 'r') as f:
-            mock_address = conda_mirror.REPODATA.format(
+            json_text = f.read()
+
+        mock_address = conda_mirror.REPODATA.format(
+            channel=channel,
+            platform=platform
+        )
+        # mock the info address
+        m.get(mock_address, text=json_text)
+        # now we need to mock the download addresses
+        conda_info = json.loads(json_text)
+        repo_info, repo_package_data = conda_mirror.get_repodata(channel, platform)
+        for pkg_name, pkg_info in repo_package_data.items():
+            url = conda_mirror.DOWNLOAD_URL.format(
                 channel=channel,
-                platform=platform
+                name=pkg_info['name'],
+                version=pkg_info['version'],
+                platform=platform,
+                file_name=pkg_name,
             )
-            print('mock_address=%s' % mock_address)
-            m.get(mock_address, text=f.read())
+            with open(os.path.join(repo, platform, pkg_name), 'br') as f:
+                data = f.read()
+            m.get(url, content=data)
         yield
 
 
 @pytest.mark.parametrize('platform', conda_mirror.DEFAULT_PLATFORMS)
-def test_get_repodata(local_repo_root, platform):
+def test_mirror_main(local_repo_root, platform, tmpdir):
     with conda_mock(platform, local_repo_root):
         channel = os.path.basename(local_repo_root)
-        ret = conda_mirror.get_repodata(channel, platform)
-        assert ret
+        mirror_test_dir = tmpdir.mkdir('mirror-test')
+        platform_dir = os.path.join(str(mirror_test_dir), platform)
+        os.mkdir(platform_dir)
+        repodata_file = os.path.join(platform_dir, 'repodata.json')
+        with open(repodata_file, 'w') as f:
+            f.write("{}")
+        conda_mirror.main(channel, str(mirror_test_dir), [platform])
+        # Make sure we mirror both files
+        downloaded_files = os.listdir(platform_dir)
+        assert "a-1-0.tar.bz2" in downloaded_files
+        assert "b-1-0.tar.bz2" in downloaded_files
+        # now lets remove one of them and try and mirror again
+        file_to_remove = downloaded_files[0]
+        os.remove(os.path.join(platform_dir, file_to_remove))
 
+        assert file_to_remove not in os.listdir(platform_dir)
+
+        conda_mirror.main(channel, str(mirror_test_dir), [platform])
+
+        # Make sure we mirror both files
+        downloaded_files = os.listdir(platform_dir)
+        assert "a-1-0.tar.bz2" in downloaded_files
+        assert "b-1-0.tar.bz2" in downloaded_files
 

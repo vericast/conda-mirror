@@ -35,7 +35,7 @@ def get_repodata(channel, platform):
     """
     url = REPODATA.format(channel=channel, platform=platform)
     json = requests.get(url).json()
-    return json['info'], json['packages']
+    return json.get('info', {}), json.get('packages', {})
 
 
 def _make_arg_parser():
@@ -113,8 +113,8 @@ def main(upstream_channel, target_directory, platform):
         upstream_repo_info, upstream_repo_packages = get_repodata(upstream_channel, platform)
         with open(os.path.join(target_directory, platform, 'repodata.json'), 'r') as f:
             j = json.load(f)
-            local_repo_info = j['info']
-            local_repo_packages = j['packages']
+            local_repo_info = j.get('info', {})
+            local_repo_packages = j.get('packages', {})
 
         packages_to_mirror = set(upstream_repo_packages.keys()).difference(set(local_repo_packages.keys()))
 
