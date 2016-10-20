@@ -1,0 +1,4 @@
+#!/bin/bash
+
+coverage run --branch -m py.test -vrsx
+coverage report -m

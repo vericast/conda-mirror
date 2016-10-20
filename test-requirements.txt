@@ -2,3 +2,4 @@ pytest
 requests
 requests-mock
 tqdm
+coverage

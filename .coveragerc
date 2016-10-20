@@ -1,0 +1,16 @@
+[run]
+source =
+    conda_mirror.py
+
+[report]
+omit =
+    */python?.?/*
+# for whatever reason, this next line is causing test coverage to not 
+# be reported on Jenkins... Commenting it out for now
+#    *test*
+# ignore _version.py and versioneer.py
+    .*version.*
+    *_version.py
+
+exclude_lines =
+    if __name__ == '__main__':
