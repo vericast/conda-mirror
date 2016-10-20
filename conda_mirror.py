@@ -4,6 +4,7 @@ import logging
 import json
 import os
 import tqdm
+import copy
 
 
 logging.basicConfig(level=logging.INFO)
@@ -90,7 +91,7 @@ def pass_thru_validator(pkg_info):
 
 
 def main(upstream_channel, target_directory, platform):
-    full_platform_list = platform.copy()
+    full_platform_list = copy.copy(platform)
     if 'all' in full_platform_list:
         full_platform_list.remove('all')
         full_platform_list = sorted(set(full_platform_list + DEFAULT_PLATFORMS))
