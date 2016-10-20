@@ -49,7 +49,7 @@ def conda_mock(platform, repo):
                 platform=platform,
                 file_name=pkg_name,
             )
-            with open(os.path.join(repo, platform, pkg_name), 'br') as f:
+            with open(os.path.join(repo, platform, pkg_name), 'rb') as f:
                 data = f.read()
             m.get(url, content=data)
         yield
@@ -71,7 +71,7 @@ def test_mirror_main(local_repo_root, platform, tmpdir):
         assert "a-1-0.tar.bz2" in downloaded_files
         assert "b-1-0.tar.bz2" in downloaded_files
         # now lets remove one of them and try and mirror again
-        file_to_remove = downloaded_files[0]
+        file_to_remove = "a-1-0.tar.bz2"
         os.remove(os.path.join(platform_dir, file_to_remove))
 
         assert file_to_remove not in os.listdir(platform_dir)
