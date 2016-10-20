@@ -16,6 +16,7 @@ DEFAULT_PLATFORMS = ['linux-64',
                      'win-64',
                      'win-32']
 
+
 def get_repodata(channel, platform):
     """Get the repodata.json file for a channel/platform combo on anaconda.org
 
@@ -62,7 +63,7 @@ def _make_arg_parser():
 def cli():
     ap = _make_arg_parser()
     args = ap.parse_args()
-    if 'all' in args.platform and len(args.platform != 1):
+    if 'all' in args.platform and len(args.platform) != 1:
         logging.warning("If you pass 'all' as a platform option, all other "
                         "options will be ignored")
     main(args.upstream_channel, args.target_directory, args.platform)
