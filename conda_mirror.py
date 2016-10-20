@@ -70,26 +70,6 @@ def cli():
     main(args.upstream_channel, args.target_directory, args.platform)
 
 
-def pass_thru_validator(pkg_info):
-    """Reference validator that simply returns the list of all packages
-
-    Parameters
-    ----------
-    pkg_info : dict
-        The second argument returned from get_repodata()
-
-    Returns
-    -------
-    valid : list
-        The package names of the packages which are valid to mirror. These
-        are the keys of the `pkg_info` dictionary
-    invalid : list
-        The package names of the packages which should not be mirrored. These
-        are the keys of the `pkg_info` dictionary
-    """
-    return list(pkg_info.keys()), []
-
-
 def main(upstream_channel, target_directory, platform):
     full_platform_list = copy.copy(platform)
     if 'all' in full_platform_list:
