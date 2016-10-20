@@ -1,0 +1,30 @@
+{
+  "a-1-0.tar.bz2": {
+    "arch": "x86",
+    "build": "0",
+    "build_number": 0,
+    "depends": [],
+    "md5": "cf9b2ea030b034b045a667217c58f962",
+    "mtime": 1476987343.083385,
+    "name": "a",
+    "platform": "linux",
+    "sig": null,
+    "size": 1202,
+    "subdir": "linux-32",
+    "version": "1"
+  },
+  "b-1-0.tar.bz2": {
+    "arch": "x86",
+    "build": "0",
+    "build_number": 0,
+    "depends": [],
+    "md5": "2ab85a94d971560abdef9c2e13a9980d",
+    "mtime": 1476987342.291781,
+    "name": "b",
+    "platform": "linux",
+    "sig": null,
+    "size": 1196,
+    "subdir": "linux-32",
+    "version": "1"
+  }
+}

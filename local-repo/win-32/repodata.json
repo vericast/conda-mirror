@@ -1,0 +1,27 @@
+{
+  "info": {},
+  "packages": {
+    "a-1-0.tar.bz2": {
+      "build": "0",
+      "build_number": 0,
+      "depends": [],
+      "md5": "1fd4600535678a24a2a90a83c703dc3a",
+      "name": "a",
+      "sig": null,
+      "size": 1201,
+      "subdir": "win-32",
+      "version": "1"
+    },
+    "b-1-0.tar.bz2": {
+      "build": "0",
+      "build_number": 0,
+      "depends": [],
+      "md5": "8aeb05b07b0ba00d128a0228e3980aed",
+      "name": "b",
+      "sig": null,
+      "size": 1195,
+      "subdir": "win-32",
+      "version": "1"
+    }
+  }
+}

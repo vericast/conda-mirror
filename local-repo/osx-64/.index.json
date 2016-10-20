@@ -1,0 +1,30 @@
+{
+  "a-1-0.tar.bz2": {
+    "arch": "x86_64",
+    "build": "0",
+    "build_number": 0,
+    "depends": [],
+    "md5": "b250e5ffd3285009fe584e4e799cdd06",
+    "mtime": 1476987343.083385,
+    "name": "a",
+    "platform": "osx",
+    "sig": null,
+    "size": 1199,
+    "subdir": "osx-64",
+    "version": "1"
+  },
+  "b-1-0.tar.bz2": {
+    "arch": "x86_64",
+    "build": "0",
+    "build_number": 0,
+    "depends": [],
+    "md5": "8ab0583477160088cc8060927ed79e7f",
+    "mtime": 1476987342.287783,
+    "name": "b",
+    "platform": "osx",
+    "sig": null,
+    "size": 1202,
+    "subdir": "osx-64",
+    "version": "1"
+  }
+}
