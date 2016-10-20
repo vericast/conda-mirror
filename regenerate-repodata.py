@@ -4,7 +4,7 @@ import sys
 import tempfile
 import shutil
 import glob
-
+import conda_mirror
 
 REPO_NAME = "local-repo"
 if os.path.exists(REPO_NAME):
@@ -29,7 +29,7 @@ else:
 if not os.path.exists(REPO_NAME):
     os.mkdir(REPO_NAME)
 
-for channel in ('linux-64', 'linux-32', 'win-32', 'win-64', 'osx-64'):
+for channel in conda_mirror.DEFAULT_PLATFORMS:
     path = os.path.join(REPO_NAME, channel)
     if not os.path.exists(path):
         os.mkdir(path)

@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 
+
 def test_regenerate_local_repo():
     if os.path.exists('local-repo'):
         raise pytest.skip("Don't need to regenerate repo. If you want to force "
@@ -12,16 +13,14 @@ def test_regenerate_local_repo():
     print("Regenerating local repo")
     subprocess.check_call('python regenerate-repodata.py'.split())
 
-@pytest.mark.parametrize('platform',
-                         ('linux-64', 'linux-32',
-                          'osx-64', 'win-32', 'win-64'))
+
+@pytest.mark.parametrize('platform', conda_mirror.DEFAULT_PLATFORMS)
 def test_get_repodata(platform):
     channel = "test"
-    MOCK_TEMPLATE = 'https://conda.anaconda.org/{channel}/{platform}/repodata.json'
     with requests_mock.mock() as m:
         repodata = os.path.join('local-repo', platform, 'repodata.json')
         with open(repodata, 'r') as f:
-            mock_address = MOCK_TEMPLATE.format(
+            mock_address = conda_mirror.REPODATA.format(
                 channel=channel,
                 platform=platform
             )
