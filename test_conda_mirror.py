@@ -73,6 +73,8 @@ def test_mirror_main(local_repo_root, platform, tmpdir):
         # now lets remove one of them and try and mirror again
         file_to_remove = "a-1-0.tar.bz2"
         os.remove(os.path.join(platform_dir, file_to_remove))
+        # need to reindex the directory
+        conda_mirror.run_conda_index(platform_dir)
 
         assert file_to_remove not in os.listdir(platform_dir)
 
@@ -98,7 +100,7 @@ def test_cli(local_repo_root, tmpdir):
         sys.argv = ['conda_mirror.py',
                     '--upstream-channel', channel,
                     '--target-directory', str(local_mirror),
-                    '--platform', 'all']
+                    '--platform', 'all', 'linux-64']
 
         conda_mirror.cli()
 

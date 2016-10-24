@@ -5,7 +5,7 @@
       "build": "0",
       "build_number": 0,
       "depends": [],
-      "md5": "6c12ecfc7e387431af426841c821d282",
+      "md5": "2916db14ee2dcbdf04dbb396ec242c70",
       "name": "a",
       "sig": null,
       "size": 1196,
@@ -16,10 +16,10 @@
       "build": "0",
       "build_number": 0,
       "depends": [],
-      "md5": "c2e91bbfb70e023a3cf7d8fe26fe517a",
+      "md5": "f95fe49230188011214ac2d4654c794e",
       "name": "b",
       "sig": null,
-      "size": 1195,
+      "size": 1194,
       "subdir": "win-64",
       "version": "1"
     }

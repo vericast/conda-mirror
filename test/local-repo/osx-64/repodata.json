@@ -5,10 +5,10 @@
       "build": "0",
       "build_number": 0,
       "depends": [],
-      "md5": "4e5f7b6617f57f157d805753ba38c872",
+      "md5": "a592111c83b44cb12ec69a23f41194d4",
       "name": "a",
       "sig": null,
-      "size": 1198,
+      "size": 1196,
       "subdir": "osx-64",
       "version": "1"
     },
@@ -16,10 +16,10 @@
       "build": "0",
       "build_number": 0,
       "depends": [],
-      "md5": "bffb4dc13d127ec2cfede48dec3e1379",
+      "md5": "7deacd36ae4b0f85a0f19a69a186c3a2",
       "name": "b",
       "sig": null,
-      "size": 1196,
+      "size": 1194,
       "subdir": "osx-64",
       "version": "1"
     }

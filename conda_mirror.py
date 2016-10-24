@@ -5,6 +5,7 @@ import json
 import os
 import tqdm
 import copy
+import subprocess
 
 
 logging.basicConfig(level=logging.INFO)
@@ -92,7 +93,11 @@ def main(upstream_channel, target_directory, platform):
     # iterate over each platform in the upstream channel
     for platform in full_platform_list:
         upstream_repo_info, upstream_repo_packages = get_repodata(upstream_channel, platform)
-        with open(os.path.join(target_directory, platform, 'repodata.json'), 'r') as f:
+        platform_dir = os.path.join(target_directory, platform)
+        repodata_file = os.path.join(platform_dir, 'repodata.json')
+        if not os.path.exists(repodata_file):
+            run_conda_index(platform_dir)
+        with open(repodata_file, 'r') as f:
             j = json.load(f)
             local_repo_info = j.get('info', {})
             local_repo_packages = j.get('packages', {})
@@ -120,6 +125,14 @@ def main(upstream_channel, target_directory, platform):
                                       unit="KB",
                                       total=expected_iterations):
                     f.write(data)
+
+        run_conda_index(os.path.join(target_directory, platform))
+
+
+def run_conda_index(target_directory):
+    logging.info("Indexing {}".format(target_directory))
+    subprocess.check_call(['conda', 'index', target_directory])
+
 
 
 if __name__ == "__main__":

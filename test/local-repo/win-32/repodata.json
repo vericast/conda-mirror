@@ -5,10 +5,10 @@
       "build": "0",
       "build_number": 0,
       "depends": [],
-      "md5": "57379ed4d14848540723938648914604",
+      "md5": "41e93c18354c9a484e2b620c224bf13e",
       "name": "a",
       "sig": null,
-      "size": 1200,
+      "size": 1201,
       "subdir": "win-32",
       "version": "1"
     },
@@ -16,10 +16,10 @@
       "build": "0",
       "build_number": 0,
       "depends": [],
-      "md5": "2a091f6efbf4e67de49a5e14d4b9f1b4",
+      "md5": "2e73bae5952d49246b89740e324bd887",
       "name": "b",
       "sig": null,
-      "size": 1196,
+      "size": 1192,
       "subdir": "win-32",
       "version": "1"
     }
