@@ -6,15 +6,17 @@ python:
 - 3.5
 
 install:
-- git clone https://github.com/ericdill/ci
-- . ci/install-miniconda.sh
+- git clone https://github.com/ericdill/ci ~/scripts
+- . ~/scripts/install-miniconda.sh
 - conda install python=$TRAVIS_PYTHON_VERSION pip conda-build
 - conda update --all
 - pip install -r test-requirements.txt
 - pip install codecov
+- pip install -e .
 
 script:
 - coverage run -m pytest -vrsx
+- conda_mirror.py -h
 
 after_success:
 - codecov
