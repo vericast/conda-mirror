@@ -3,13 +3,14 @@
 [![codecov](https://codecov.io/gh/ericdill/conda-mirror/branch/master/graph/badge.svg)](https://codecov.io/gh/ericdill/conda-mirror)
 
 
-## Usage
+## Example Usage
 
 WARNING: Invoking this command will pull ~10GB and take at least an hour
 ```bash
 $ python conda_mirror.py --upstream-channel conda-forge --target-directory local_mirror --platform linux-64
 ```
 
+## CLI
 ```
 $ python conda_mirror.py  -h
 usage: conda_mirror.py [-h] [--upstream-channel UPSTREAM_CHANNEL]

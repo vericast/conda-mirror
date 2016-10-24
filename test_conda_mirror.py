@@ -21,7 +21,7 @@ def ensure_local_repo(repo):
 def test_ensure_local_repo(local_repo_root):
     if os.path.exists(local_repo_root):
         pytest.skip("Don't need to regenerate repo. If you want to force "
-                    "regeneration, remove the 'local-repo' dir")
+                    "regeneration, remove the 'test/local-repo' dir")
     ensure_local_repo(local_repo_root)
 
 @contextmanager
