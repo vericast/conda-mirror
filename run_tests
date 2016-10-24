@@ -1,4 +1,5 @@
 #!/bin/bash
 pip install -r test-requirements.txt
+conda-mirror -h
 coverage run -m py.test -vrsx
 coverage report -m
