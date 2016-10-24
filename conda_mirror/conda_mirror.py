@@ -106,7 +106,7 @@ def main(upstream_channel, target_directory, platform):
 
         packages_to_mirror = set(upstream_repo_packages.keys()).difference(set(local_repo_packages.keys()))
 
-        for package in packages_to_mirror:
+        for idx, package in enumerate(packages_to_mirror):
             info = upstream_repo_packages[package]
             url = DOWNLOAD_URL.format(
                 channel=upstream_channel,
@@ -127,6 +127,10 @@ def main(upstream_channel, target_directory, platform):
                                       unit="KB",
                                       total=expected_iterations):
                     f.write(data)
+            if idx != 0 and idx % 20 == 0:
+                # intermittently run conda index so that, in case of failure, 
+                # not all downloads need to be repeated
+                run_conda_index(os.path.join(target_directory, platform))
 
         run_conda_index(os.path.join(target_directory, platform))
 
