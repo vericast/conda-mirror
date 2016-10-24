@@ -9,11 +9,11 @@ install:
 - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O mc.sh
 - bash mc.sh -b -p ~/miniconda
 - export PATH=~/miniconda/bin:$PATH
-- |
-  echo "channels:
-- conda-forge
-- defaults
-always_yes: True" > ~/.condarc
+- echo "channels:" > ~/.condarc
+- echo "  - conda-forge" >> ~/.condarc
+- echo "  - defaults" >> ~/.condarc
+- echo "always_yes: true" >> ~/.condarc
+- echo "show_channel_urls: true" >> ~/.condarc
 - export CONDARC=~/.condarc
 - conda install python=$TRAVIS_PYTHON_VERSION pip conda-build
 - conda update --all
