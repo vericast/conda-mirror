@@ -17,6 +17,6 @@ setup(
         'requests',
         'tqdm'
     ],
-    scripts=['conda_mirror.py'],
+    scripts=['conda_mirror/conda_mirror.py'],
 )
 

@@ -1,4 +1,4 @@
-import conda_mirror
+from conda_mirror import conda_mirror
 import pytest
 import requests_mock
 import os

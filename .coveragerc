@@ -1,6 +1,6 @@
 [run]
 source =
-    conda_mirror.py
+    conda_mirror/
 
 [report]
 omit =
