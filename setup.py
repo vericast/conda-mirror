@@ -10,4 +10,8 @@ setup(
     url='http://bitbucket.maxpointinteractive.com/mf/conda-mirror',
     platforms='Cross platform (Linux, Mac OSX, Windows)',
     license='BSD 3-Clause',
+    install_requires=[
+        'requests',
+        'tqdm'
+    ]
 )
