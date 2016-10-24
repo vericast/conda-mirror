@@ -1,11 +1,13 @@
-from setuptools import setup
-import conda_mirror
+from setuptools import setup, find_packages
+import versioneer
+
 
 setup(
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     name='conda_mirror',
     author="Eric Dill",
-    py_modules=['conda_mirror'],
-    version=conda_mirror.__version__,
+    packages=find_packages(),
     author_email='eric.dill@maxpoint.com',
     description='mirror an upstream conda channel to a local directory',
     url='https://github.com/ericdill/conda-mirror',
@@ -17,3 +19,4 @@ setup(
     ],
     scripts=['conda_mirror.py'],
 )
+

@@ -3,14 +3,14 @@ import argparse
 import logging
 import json
 import os
-import tqdm
 import copy
 import subprocess
+import requests
+import tqdm
 
-
-__version__ = "0.0.4"
 
 logging.basicConfig(level=logging.INFO)
+
 
 DOWNLOAD_URL="https://anaconda.org/{channel}/{name}/{version}/download/{platform}/{file_name}"
 REPODATA = 'https://conda.anaconda.org/{channel}/{platform}/repodata.json'
