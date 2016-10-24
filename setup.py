@@ -19,7 +19,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            'conda-mirror = conda_mirror.conda_mirror:main'
+            'conda-mirror = conda_mirror.conda_mirror:cli'
         ]
     }
 )
