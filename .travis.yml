@@ -11,9 +11,9 @@ install:
 - export PATH=~/miniconda/bin:$PATH
 - |
   echo "channels:
-  - conda-forge
-  -  defaults
-  always_yes: True" > ~/.condarc
+- conda-forge
+- defaults
+always_yes: True" > ~/.condarc
 - export CONDARC=~/.condarc
 - conda install python=$TRAVIS_PYTHON_VERSION pip conda-build
 - conda update --all
