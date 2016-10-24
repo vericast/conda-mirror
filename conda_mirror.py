@@ -8,6 +8,8 @@ import copy
 import subprocess
 
 
+__version__ = "0.0.2"
+
 logging.basicConfig(level=logging.INFO)
 
 DOWNLOAD_URL="https://anaconda.org/{channel}/{name}/{version}/download/{platform}/{file_name}"
