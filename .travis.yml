@@ -6,6 +6,16 @@ python:
 - 3.5
 
 install:
+- wget http://bit.ly/get-miniconda -O mc.sh
+- bash mc.sh -b -p ~/miniconda
+- export PATH=~/miniconda/bin:$PATH
+- echo "channels:
+- conda-forge
+- defaults
+always_yes: True" > ~/.condarc
+- export CONDARC=~/.condarc
+- conda install python=$TRAVIS_PYTHON_VERSION pip conda-build
+- conda update --all
 - pip install -r test-requirements.txt
 - pip install codecov
 
