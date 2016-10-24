@@ -16,7 +16,7 @@ install:
 
 script:
 - ./run_tests
-- conda_mirror.py -h
+- conda-mirror -h
 
 after_success:
 - codecov
