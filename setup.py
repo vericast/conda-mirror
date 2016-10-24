@@ -17,6 +17,10 @@ setup(
         'requests',
         'tqdm'
     ],
-    scripts=['conda_mirror/conda_mirror.py'],
+    entry_points={
+        "console_scripts": [
+            'conda-mirror = conda_mirror.conda_mirror:main'
+        ]
+    }
 )
 
