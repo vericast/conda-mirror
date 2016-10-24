@@ -134,7 +134,6 @@ def run_conda_index(target_directory):
     subprocess.check_call(['conda', 'index', target_directory])
 
 
-
 if __name__ == "__main__":
     import sys
     if sys.version_info.major < 3:

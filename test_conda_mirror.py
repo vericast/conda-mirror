@@ -85,6 +85,7 @@ def test_mirror_main(local_repo_root, platform, tmpdir):
         assert "a-1-0.tar.bz2" in downloaded_files
         assert "b-1-0.tar.bz2" in downloaded_files
 
+
 def test_cli(local_repo_root, tmpdir):
     with conda_mock(conda_mirror.DEFAULT_PLATFORMS, local_repo_root):
         old_argv = copy.copy(sys.argv)
