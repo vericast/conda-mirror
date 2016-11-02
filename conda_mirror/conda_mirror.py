@@ -74,11 +74,10 @@ def cli():
 
 
 def not_in_upstream(local_repo_metadata, upstream_repo_metadata):
-    upstream_package_names = list(upstream_repo_metadata.keys())
-    local_package_names = list(local_repo_metadata.keys())
-    for pkg in upstream_package_names:
-        if pkg not in local_package_names:
-            yield pkg
+    upstream_package_names = set(upstream_repo_metadata.keys())
+    local_package_names = set(local_repo_metadata.keys())
+    for pkg in upstream_package_names.difference(local_package_names):
+        yield pkg
 
 
 def not_blacklisted_license(package_names_to_mirror, upstream_repo_metadata,
