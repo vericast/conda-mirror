@@ -47,10 +47,6 @@ for root, dirs, files in os.walk(join('test', 'recipes')):
         except subprocess.CalledProcessError as cpe:
             import pdb; pdb.set_trace()
             print(cpe)
-#
-# for recipe in ('a', 'b'):
-#     subprocess.check_call(('conda build test/recipes/%s' % recipe).split(),
-#                           env=os.environ)
 
 copy_from = os.path.join(CONDA_BLD_PATH, CONDA_PLATFORM, "*.tar.bz2")
 copy_to = os.path.join(REPO_NAME, CONDA_PLATFORM)
