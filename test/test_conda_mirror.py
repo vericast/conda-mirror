@@ -84,6 +84,8 @@ def test_mirror_main(local_repo_root, platform, tmpdir):
         downloaded_files = os.listdir(platform_dir)
         assert "a-1-0.tar.bz2" in downloaded_files
         assert "b-1-0.tar.bz2" in downloaded_files
+        assert "c-1-0.tar.bz2" not in downloaded_files
+        assert "d-1-0.tar.bz2" not in downloaded_files
 
 
 def test_cli(local_repo_root, tmpdir):
@@ -110,6 +112,5 @@ def test_cli(local_repo_root, tmpdir):
             contents = os.listdir(platform_dir)
             assert "a-1-0.tar.bz2" in contents
             assert "b-1-0.tar.bz2" in contents
-
-
-
+            assert "c-1-0.tar.bz2" not in contents
+            assert "d-1-0.tar.bz2" not in contents

@@ -10,7 +10,7 @@ import tqdm
 
 
 logging.basicConfig(level=logging.INFO)
-
+DEFAULT_BAD_LICENSES = ['agpl', '']
 
 DOWNLOAD_URL="https://anaconda.org/{channel}/{name}/{version}/download/{platform}/{file_name}"
 REPODATA = 'https://conda.anaconda.org/{channel}/{platform}/repodata.json'
@@ -73,6 +73,35 @@ def cli():
     main(args.upstream_channel, args.target_directory, args.platform)
 
 
+def not_in_upstream(local_repo_metadata, upstream_repo_metadata):
+    upstream_package_names = set(upstream_repo_metadata.keys())
+    local_package_names = set(local_repo_metadata.keys())
+    for pkg in upstream_package_names.difference(local_package_names):
+        yield pkg
+
+
+def not_blacklisted_license(package_names_to_mirror, upstream_repo_metadata,
+                            bad_licenses=None):
+    if bad_licenses is None:
+        bad_licenses = DEFAULT_BAD_LICENSES
+
+    upstream_package_names = list(upstream_repo_metadata.keys())
+
+    for pkg in package_names_to_mirror:
+        logging.info('checking if {} has a bad license'.format(pkg))
+        pkg_info = upstream_repo_metadata[pkg]
+        if not pkg_info.get('license', ''):
+            logging.error("No license in {}. Will not mirror internally"
+                          "".format(pkg))
+        for license in bad_licenses:
+            if pkg_info.get('license', '').lower() == license:
+                logging.error("Not going to mirror {} because it's license is "
+                              "not friendly: {}".format(pkg, license))
+                break
+        else:
+            yield pkg
+
+
 def main(upstream_channel, target_directory, platform):
     full_platform_list = copy.copy(platform)
     if 'all' in full_platform_list:
@@ -104,7 +133,10 @@ def main(upstream_channel, target_directory, platform):
             local_repo_info = j.get('info', {})
             local_repo_packages = j.get('packages', {})
 
-        packages_to_mirror = set(upstream_repo_packages.keys()).difference(set(local_repo_packages.keys()))
+        packages_to_mirror = not_in_upstream(local_repo_packages,
+                                             upstream_repo_packages)
+        packages_to_mirror = not_blacklisted_license(packages_to_mirror,
+                                                     upstream_repo_packages)
 
         for idx, package in enumerate(packages_to_mirror):
             info = upstream_repo_packages[package]
@@ -128,10 +160,11 @@ def main(upstream_channel, target_directory, platform):
                                       total=expected_iterations):
                     f.write(data)
             if idx != 0 and idx % 20 == 0:
-                # intermittently run conda index so that, in case of failure, 
+                # intermittently run conda index so that, in case of failure,
                 # not all downloads need to be repeated
                 run_conda_index(os.path.join(target_directory, platform))
 
+        # also run conda index at the end of the job
         run_conda_index(os.path.join(target_directory, platform))
 
 

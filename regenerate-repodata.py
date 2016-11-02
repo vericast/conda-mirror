@@ -4,8 +4,9 @@ import sys
 import tempfile
 import shutil
 import glob
-import conda_mirror
+from conda_mirror import conda_mirror
 import sys
+from os.path import join
 
 if len(sys.argv) != 2:
     print("Pass the target directory for the repo as the second argument")
@@ -38,9 +39,14 @@ for channel in conda_mirror.DEFAULT_PLATFORMS:
     if not os.path.exists(path):
         os.mkdir(path)
 
-for recipe in ('a', 'b'):
-    subprocess.check_call(('conda build test/recipes/%s' % recipe).split(),
-                          env=os.environ)
+for root, dirs, files in os.walk(join('test', 'recipes')):
+    print(root)
+    if 'meta.yaml' in files:
+        try:
+            subprocess.check_output(['conda', 'build', root, '--debug'], env=os.environ)
+        except subprocess.CalledProcessError as cpe:
+            import pdb; pdb.set_trace()
+            print(cpe)
 
 copy_from = os.path.join(CONDA_BLD_PATH, CONDA_PLATFORM, "*.tar.bz2")
 copy_to = os.path.join(REPO_NAME, CONDA_PLATFORM)

@@ -1,6 +1,6 @@
 package:
-  name: b
+  name: c
   version: 1
 
 about:
-  license: MIT
+  license: aGpL
