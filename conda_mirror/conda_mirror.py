@@ -4,9 +4,13 @@ import logging
 import json
 import os
 import copy
-import subprocess
+from pprint import pformat
 import requests
 import tqdm
+from collections import deque
+import fnmatch
+from conda_build.config import Config
+from conda_build.index import update_index
 
 
 logging.basicConfig(level=logging.INFO)
@@ -60,6 +64,12 @@ def _make_arg_parser():
               " 'linux-64', 'linux-32', 'osx-64', 'win-32', 'win-64'}"),
         default=[],
     )
+    ap.add_argument(
+        '--blacklist-packages',
+        nargs="+",
+        help=("List of packages to blacklist. Separate with a space"),
+        default=[],
+    )
 
     return ap
 
@@ -70,7 +80,7 @@ def cli():
     if 'all' in args.platform and len(args.platform) != 1:
         logging.warning("If you pass 'all' as a platform option, all other "
                         "options will be ignored")
-    main(args.upstream_channel, args.target_directory, args.platform)
+    main(args.upstream_channel, args.target_directory, args.platform, args.blacklist_packages)
 
 
 def not_in_upstream(local_repo_metadata, upstream_repo_metadata):
@@ -102,7 +112,18 @@ def not_blacklisted_license(package_names_to_mirror, upstream_repo_metadata,
             yield pkg
 
 
-def main(upstream_channel, target_directory, platform):
+def not_blacklisted_package(package_names_to_mirror, blacklist_packages):
+    logging.info("Checking that package names do not match "
+                 "blacklist_packages:")
+    logging.info(pformat(blacklist_packages))
+    for pkg in package_names_to_mirror:
+        matched = fnmatch.filter(blacklist_packages, pkg)
+        if matched:
+            logging.info("{} matches one of the blacklisted packages".format(pkg))
+            continue
+        yield pkg
+
+def main(upstream_channel, target_directory, platform, blacklist_packages):
     full_platform_list = copy.copy(platform)
     if 'all' in full_platform_list:
         full_platform_list.remove('all')
@@ -121,6 +142,7 @@ def main(upstream_channel, target_directory, platform):
     logging.info("Going to look on {} for the following platforms: {}"
                  "".format(upstream_channel, full_platform_list))
 
+    mirrored_packages = deque()
     # iterate over each platform in the upstream channel
     for platform in full_platform_list:
         upstream_repo_info, upstream_repo_packages = get_repodata(upstream_channel, platform)
@@ -137,8 +159,11 @@ def main(upstream_channel, target_directory, platform):
                                              upstream_repo_packages)
         packages_to_mirror = not_blacklisted_license(packages_to_mirror,
                                                      upstream_repo_packages)
+        packages_to_mirror = not_blacklisted_package(packages_to_mirror,
+                                                     blacklist_packages)
 
         for idx, package in enumerate(packages_to_mirror):
+            mirrored_packages.append((platform, package))
             info = upstream_repo_packages[package]
             url = DOWNLOAD_URL.format(
                 channel=upstream_channel,
@@ -159,18 +184,22 @@ def main(upstream_channel, target_directory, platform):
                                       unit="KB",
                                       total=expected_iterations):
                     f.write(data)
-            if idx != 0 and idx % 20 == 0:
+            if idx % 5 == 0:
                 # intermittently run conda index so that, in case of failure,
                 # not all downloads need to be repeated
                 run_conda_index(os.path.join(target_directory, platform))
 
         # also run conda index at the end of the job
         run_conda_index(os.path.join(target_directory, platform))
-
+    logging.info("Done mirroring.")
+    logging.info("The packages that were mirrored are:")
+    logging.info(pformat(mirrored_packages))
 
 def run_conda_index(target_directory):
     logging.info("Indexing {}".format(target_directory))
-    subprocess.check_call(['conda', 'index', target_directory])
+    config = Config()
+    config.timeout=1
+    update_index(target_directory, config, could_be_mirror=False)
 
 
 if __name__ == "__main__":
