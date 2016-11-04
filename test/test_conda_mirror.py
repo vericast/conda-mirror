@@ -65,7 +65,7 @@ def test_mirror_main(local_repo_root, platform, tmpdir):
         repodata_file = os.path.join(platform_dir, 'repodata.json')
         with open(repodata_file, 'w') as f:
             f.write("{}")
-        conda_mirror.main(channel, str(mirror_test_dir), [platform], blacklist_packages=[])
+        conda_mirror.main(channel, str(mirror_test_dir), [platform])
         # Make sure we mirror both files
         downloaded_files = os.listdir(platform_dir)
         assert "a-1-0.tar.bz2" in downloaded_files
@@ -78,7 +78,7 @@ def test_mirror_main(local_repo_root, platform, tmpdir):
 
         assert file_to_remove not in os.listdir(platform_dir)
 
-        conda_mirror.main(channel, str(mirror_test_dir), [platform], blacklist_packages=[])
+        conda_mirror.main(channel, str(mirror_test_dir), [platform])
 
         # Make sure we mirror both files
         downloaded_files = os.listdir(platform_dir)
@@ -100,11 +100,10 @@ def test_cli(local_repo_root, tmpdir):
                 f.write("{}")
 
         channel = os.path.basename(local_repo_root)
-        sys.argv = ['conda_mirror',
+        sys.argv = ['conda_mirror.py',
                     '--upstream-channel', channel,
                     '--target-directory', str(local_mirror),
-                    '--platform', 'all', 'linux-64',
-                   ]
+                    '--platform', 'all', 'linux-64']
 
         conda_mirror.cli()
 
