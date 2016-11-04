@@ -112,17 +112,6 @@ def not_blacklisted_license(package_names_to_mirror, upstream_repo_metadata,
             yield pkg
 
 
-def not_blacklisted_package(package_names_to_mirror, blacklist_packages):
-    logging.info("Checking that package names do not match "
-                 "blacklist_packages:")
-    logging.info(pformat(blacklist_packages))
-    for pkg in package_names_to_mirror:
-        matched = fnmatch.filter(blacklist_packages, pkg)
-        if matched:
-            logging.info("{} matches one of the blacklisted packages".format(pkg))
-            continue
-        yield pkg
-
 def main(upstream_channel, target_directory, platform, blacklist_packages):
     full_platform_list = copy.copy(platform)
     if 'all' in full_platform_list:
@@ -159,8 +148,6 @@ def main(upstream_channel, target_directory, platform, blacklist_packages):
                                              upstream_repo_packages)
         packages_to_mirror = not_blacklisted_license(packages_to_mirror,
                                                      upstream_repo_packages)
-        packages_to_mirror = not_blacklisted_package(packages_to_mirror,
-                                                     blacklist_packages)
 
         for idx, package in enumerate(packages_to_mirror):
             mirrored_packages.append((platform, package))
