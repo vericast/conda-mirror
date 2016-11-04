@@ -64,12 +64,6 @@ def _make_arg_parser():
               " 'linux-64', 'linux-32', 'osx-64', 'win-32', 'win-64'}"),
         default=[],
     )
-    ap.add_argument(
-        '--blacklist-packages',
-        nargs="+",
-        help=("List of packages to blacklist. Separate with a space"),
-        default=[],
-    )
 
     return ap
 
@@ -80,7 +74,7 @@ def cli():
     if 'all' in args.platform and len(args.platform) != 1:
         logging.warning("If you pass 'all' as a platform option, all other "
                         "options will be ignored")
-    main(args.upstream_channel, args.target_directory, args.platform, args.blacklist_packages)
+    main(args.upstream_channel, args.target_directory, args.platform)
 
 
 def not_in_upstream(local_repo_metadata, upstream_repo_metadata):
@@ -112,7 +106,7 @@ def not_blacklisted_license(package_names_to_mirror, upstream_repo_metadata,
             yield pkg
 
 
-def main(upstream_channel, target_directory, platform, blacklist_packages):
+def main(upstream_channel, target_directory, platform):
     full_platform_list = copy.copy(platform)
     if 'all' in full_platform_list:
         full_platform_list.remove('all')
