@@ -8,7 +8,6 @@ from pprint import pformat
 import requests
 import tqdm
 from collections import deque
-import fnmatch
 from conda_build.config import Config
 from conda_build.index import update_index
 
