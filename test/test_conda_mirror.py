@@ -1,3 +1,5 @@
+from __future__ import (unicode_literals, print_function, division, 
+                        absolute_import)
 from conda_mirror import conda_mirror
 import pytest
 import requests_mock
@@ -126,7 +128,7 @@ def test_handling_bad_package(local_repo_root):
         f.write("This is a fake package".encode())
     
     assert bad_pkg_name in os.listdir(bad_pkg_root)
-    
+
     conda_mirror.run_conda_index(bad_pkg_root)
 
     assert bad_pkg_name not in os.listdir(bad_pkg_root)
