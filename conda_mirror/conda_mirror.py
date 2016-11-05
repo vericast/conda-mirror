@@ -10,6 +10,7 @@ import tqdm
 from collections import deque
 from conda_build.config import Config
 from conda_build.index import update_index
+import fnmatch
 
 
 logging.basicConfig(level=logging.INFO)
@@ -152,7 +153,7 @@ def main(upstream_channel, target_directory, platform):
                 platform=platform,
                 file_name=package,
             )
-            print(url)
+            logging.info("download_url={}".format(url))
             expected_size = info['size']
             chunk_size = 1024  # 1KB chunks
             expected_iterations = expected_size // chunk_size + 1
@@ -179,7 +180,19 @@ def run_conda_index(target_directory):
     logging.info("Indexing {}".format(target_directory))
     config = Config()
     config.timeout=1
-    update_index(target_directory, config, could_be_mirror=False)
+    try:
+        update_index(target_directory, config, could_be_mirror=False)
+    except RuntimeError as re:
+        # ['Could', 'not', 'extract', 'upstream-mirror/linux-64/numpy-1.7.1-py27_p0.tar.bz2.', 'File', 'probably', 'corrupt.']
+        err_msg = str(re).split()
+        # find the one that looks like a filename
+        fname, = fnmatch.filter(err_msg, "*.tar.bz2*")
+        # and drop the trailing '.'
+        if fname.endswith('.'):
+            fname = fname[:-1]
+        logging.info("Caught an exception while trying to index: {}".format(re))
+        logging.info("Removing: {}".format(fname))
+        os.remove(fname)
 
 
 if __name__ == "__main__":
