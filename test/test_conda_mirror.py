@@ -7,6 +7,7 @@ import os
 import subprocess
 from contextlib import contextmanager
 import sys
+import bz2
 import copy
 
 @pytest.fixture(scope='session')
@@ -124,7 +125,8 @@ def test_handling_bad_package(local_repo_root):
     bad_pkg_path = os.path.join(bad_pkg_root, bad_pkg_name)
     if os.path.exists(bad_pkg_path):
         os.remove(bad_pkg_path)
-    with open(bad_pkg_path, 'wb') as f:
+    
+    with bz2.BZ2File(bad_pkg_path, 'wb') as f:
         f.write("This is a fake package".encode())
     
     assert bad_pkg_name in os.listdir(bad_pkg_root)
