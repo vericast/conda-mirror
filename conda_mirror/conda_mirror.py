@@ -51,7 +51,7 @@ def get_repodata(channel, platform):
 
 def _make_arg_parser():
     """
-    Helper function to localize the ArgumentParser logic
+    Localize the ArgumentParser logic
 
     Returns
     -------
@@ -81,7 +81,7 @@ def _make_arg_parser():
 
 def cli():
     """
-    Function that collects arguments from sys.argv and invokes the main() function.
+    Collect arguments from sys.argv and invoke the main() function.
     """
     ap = _make_arg_parser()
     args = ap.parse_args()
@@ -140,7 +140,6 @@ def not_blacklisted_license(package_names_to_mirror, upstream_repo_metadata,
     package_name : str
         A continuous stream of package names whose licenses do not match those
         in `bad_licenses`
-
     """
     if bad_licenses is None:
         bad_licenses = DEFAULT_BAD_LICENSES
