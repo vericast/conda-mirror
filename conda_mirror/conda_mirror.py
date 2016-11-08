@@ -11,8 +11,9 @@ import requests
 import tqdm
 from collections import deque
 from conda_build.config import Config
-from conda_build.index import update_index
+from conda_build.index import update_index,read_index_tar
 import fnmatch
+import tarfile
 
 
 logging.basicConfig(level=logging.INFO)
@@ -194,7 +195,38 @@ def run_conda_index(target_directory):
             fname = fname[:-1]
         logging.info("Caught an exception while trying to index: {}".format(re))
         logging.info("Removing: {}".format(fname))
-        os.remove(fname)
+        _remove_package(fname)
+        run_conda_index(target_directory)
+    except tarfile.ReadError as re:
+        # Find the new packages that don't exist in the repodata
+        bad_package, = _find_bad_package(target_directory)
+        _remove_package(bad_package)
+        run_conda_index(target_directory)
+
+
+def _find_bad_package(local_platform_directory):
+        repodata_fname = os.path.join(local_platform_directory, 'repodata.json')
+        with open(repodata_fname, 'r') as f:
+            repodata = json.load(f)
+        repodata_info, repodata_packages = repodata.get('info', {}), repodata.get('packages', {})
+        indexed_packages = list(repodata_packages.keys())
+        all_packages = fnmatch.filter(os.listdir(local_platform_directory), "*.tar.bz2")
+        potentially_bad = set(all_packages).difference(indexed_packages)
+        for pkg in potentially_bad:
+            full_pkg_path = os.path.join(local_platform_directory, pkg)
+            try:
+                read_index_tar(full_pkg_path, Config())
+            except tarfile.ReadError as re:
+                msg = "tarfile.ReadError encountered. Original error: {}".format(re)
+                msg += "\nRemoving bad package: {}".format(full_pkg_path)
+                logging.error(msg)
+                yield full_pkg_path
+
+
+def _remove_package(pkg_path):
+    logging.info("Removing: {}".format(pkg_path))
+    os.remove(pkg_path)
+
 
 
 if __name__ == "__main__":
