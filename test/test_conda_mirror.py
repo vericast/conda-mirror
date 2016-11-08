@@ -1,3 +1,5 @@
+from __future__ import (unicode_literals, print_function, division, 
+                        absolute_import)
 from conda_mirror import conda_mirror
 import pytest
 import requests_mock
@@ -5,6 +7,7 @@ import os
 import subprocess
 from contextlib import contextmanager
 import sys
+import bz2
 import copy
 
 @pytest.fixture(scope='session')
@@ -114,3 +117,21 @@ def test_cli(local_repo_root, tmpdir):
             assert "b-1-0.tar.bz2" in contents
             assert "c-1-0.tar.bz2" not in contents
             assert "d-1-0.tar.bz2" not in contents
+
+
+def test_handling_bad_package(local_repo_root):
+    bad_pkg_root = os.path.join(local_repo_root, 'linux-64')
+    bad_pkg_name = 'bad-1-0.tar.bz2'
+    bad_pkg_path = os.path.join(bad_pkg_root, bad_pkg_name)
+    if os.path.exists(bad_pkg_path):
+        os.remove(bad_pkg_path)
+    
+    with bz2.BZ2File(bad_pkg_path, 'wb') as f:
+        f.write("This is a fake package".encode())
+    
+    assert bad_pkg_name in os.listdir(bad_pkg_root)
+
+    conda_mirror.run_conda_index(bad_pkg_root)
+
+    assert bad_pkg_name not in os.listdir(bad_pkg_root)
+    
