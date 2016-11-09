@@ -16,7 +16,8 @@ import fnmatch
 import tarfile
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)-15s %(message)s')
 DEFAULT_BAD_LICENSES = ['agpl', '']
 
 DOWNLOAD_URL="https://anaconda.org/{channel}/{name}/{version}/download/{platform}/{file_name}"
@@ -75,6 +76,12 @@ def _make_arg_parser():
               " 'linux-64', 'linux-32', 'osx-64', 'win-32', 'win-64'}"),
         default=[],
     )
+    ap.add_argument(
+        '-v', '--verbose',
+        action="store_true",
+        help="This basically turns on tqdm progress bars for downloads",
+        default=False,
+    )
 
     return ap
 
@@ -88,7 +95,7 @@ def cli():
     if 'all' in args.platform and len(args.platform) != 1:
         logging.warning("If you pass 'all' as a platform option, all other "
                         "options will be ignored")
-    main(args.upstream_channel, args.target_directory, args.platform)
+    main(args.upstream_channel, args.target_directory, args.platform, args.verbose)
 
 
 def not_in_upstream(local_repo_metadata, upstream_repo_metadata):
@@ -167,7 +174,7 @@ def not_blacklisted_license(package_names_to_mirror, upstream_repo_metadata,
             yield pkg
 
 
-def main(upstream_channel, target_directory, platform):
+def main(upstream_channel, target_directory, platform, verbose=False):
     """
     The business logic of conda_mirror.
 
@@ -181,6 +188,8 @@ def main(upstream_channel, target_directory, platform):
     platform : iterable
         The platforms that you want to mirror from anaconda.org/<upstream_channel>
         The defaults are listed in the module level global "DEFAULT_PLATFORMS"
+    verbose : bool
+        Increase chattiness of conda-mirror
     """
     full_platform_list = copy.copy(platform)
     if 'all' in full_platform_list:
@@ -235,10 +244,13 @@ def main(upstream_channel, target_directory, platform):
             with open(os.path.join(target_directory, platform, package), 'wb') as f:
                 logging.info("Downloading {}".format(package))
                 ret = requests.get(url, stream=True)
-                for data in tqdm.tqdm(ret.iter_content(chunk_size),
-                                      desc=package,
-                                      unit="KB",
-                                      total=expected_iterations):
+                iterator = ret.iter_content(chunk_size)
+                if verbose:
+                    iterator = tqdm.tqdm(iterator,
+                                         desc=package,
+                                         unit="KB",
+                                         total=expected_iterations)
+                for data in iterator:
                     f.write(data)
             if idx % 5 == 0:
                 # intermittently run conda index so that, in case of failure,
