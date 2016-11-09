@@ -133,7 +133,8 @@ def not_blacklisted_license(package_names_to_mirror, upstream_repo_metadata,
         that we are mirroring locally
     bad_licenses: iterable, optional
         All licenses that are considered "bad".  Packages whose licenses are 
-        in `bad_licenses` will not be mirrored locally
+        in `bad_licenses` will not be mirrored locally.
+        Defaults to module level `DEFAULT_BAD_LICENSES`
     
     Yields
     ------
@@ -143,17 +144,22 @@ def not_blacklisted_license(package_names_to_mirror, upstream_repo_metadata,
     """
     if bad_licenses is None:
         bad_licenses = DEFAULT_BAD_LICENSES
+    none_is_bad = False
+    if None in bad_licenses:
+        none_is_bad = True
+        bad_licenses.remove(None)
 
     upstream_package_names = list(upstream_repo_metadata.keys())
 
     for pkg in package_names_to_mirror:
         logging.info('checking if {} has a bad license'.format(pkg))
         pkg_info = upstream_repo_metadata[pkg]
-        if not pkg_info.get('license', ''):
-            logging.error("No license in {}. Will not mirror internally"
-                          "".format(pkg))
+        pkg_license = pkg_info.get('license') or ''
+        if none_is_bad and not pkg_license:
+            logging.error("Will not mirror {} because it has no license listed")
+            continue
         for license in bad_licenses:
-            if pkg_info.get('license', '').lower() == license:
+            if pkg_license.lower() == license:
                 logging.error("Not going to mirror {} because it's license is "
                               "not friendly: {}".format(pkg, license))
                 break
