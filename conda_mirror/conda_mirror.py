@@ -277,7 +277,7 @@ def run_conda_index(target_directory):
     """
     logging.info("Indexing {}".format(target_directory))
     config = Config()
-    config.timeout=1
+    config.timeout = 1
     try:
         update_index(target_directory, config, could_be_mirror=False)
     except RuntimeError as re:
