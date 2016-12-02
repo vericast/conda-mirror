@@ -1,4 +1,4 @@
-from __future__ import (unicode_literals, print_function, division, 
+from __future__ import (unicode_literals, print_function, division,
                         absolute_import)
 import requests
 import argparse
@@ -102,21 +102,21 @@ def not_in_upstream(local_repo_metadata, upstream_repo_metadata):
     """
     Produce a stream of packages that exist on the upstream channel but
     not the local mirror
-    
+
     Parameters
     ----------
     local_repo_metadata : dict
-        This is the 'packages' key from the repodata.json file 
+        This is the 'packages' key from the repodata.json file
         from the local channel
     upstream_repo_metadata : dict
-        This is the 'packages' key from the repodata.json file 
+        This is the 'packages' key from the repodata.json file
         from the upstream channel
-    
+
     Yields
     ------
     package_name : str
         A continuous stream of package names that exist on the upstream channel
-        but not the local one 
+        but not the local one
     """
     upstream_package_names = set(upstream_repo_metadata.keys())
     local_package_names = set(local_repo_metadata.keys())
@@ -132,17 +132,17 @@ def not_blacklisted_license(package_names_to_mirror, upstream_repo_metadata,
     Parameters
     ----------
     package_names_to_mirror : iterable
-        An iterable of package names to check and see if they have unfriendly 
-        licenses. These package names should be keys in the 
+        An iterable of package names to check and see if they have unfriendly
+        licenses. These package names should be keys in the
         `upstream_repo_metadata` dict
     upstream_repo_metadata : dict
         The 'packages' value of the repodata.json dict for the upstream channel
         that we are mirroring locally
     bad_licenses: iterable, optional
-        All licenses that are considered "bad".  Packages whose licenses are 
+        All licenses that are considered "bad".  Packages whose licenses are
         in `bad_licenses` will not be mirrored locally.
         Defaults to module level `DEFAULT_BAD_LICENSES`
-    
+
     Yields
     ------
     package_name : str
@@ -172,6 +172,9 @@ def not_blacklisted_license(package_names_to_mirror, upstream_repo_metadata,
                 break
         else:
             yield pkg
+
+
+def main2(upstream_channel, target_directory, platform, blacklist=None, whitelist=None, verbose=False):
 
 
 def main(upstream_channel, target_directory, platform, verbose=False):
@@ -271,9 +274,9 @@ def run_conda_index(target_directory):
     Parameters
     ----------
     target_directory : str
-        The full path to the platform subdirectory inside of the local conda 
+        The full path to the platform subdirectory inside of the local conda
         channel. The directory at this path should contain a "repodata.json" file
-        e.g., /path/to/local/repo/linux-64 
+        e.g., /path/to/local/repo/linux-64
     """
     logging.info("Indexing {}".format(target_directory))
     config = Config()
@@ -309,7 +312,7 @@ def _find_bad_package(local_platform_directory):
         Path to one of the platform subdirectories of a local conda channel
         e.g., this is the folder that should contain all of the conda packages
         and a "repodata.json"
-    
+
     Yields
     ------
     full_pkg_path : str
