@@ -24,11 +24,3 @@ def match(all_packages, target_packages):
             if fnmatch.fnmatch(str(pkg_info.get(key, '')), glob):
                 matched.update({pkg_name: pkg_info})
     return matched
-
-
-if __name__ == "__main__":
-    from conda_mirror import get_repodata
-    repodata_info, repodata_packages = get_repodata('anaconda', 'linux-64')
-    matched = match(repodata_packages, {'name': 'jupyter'})
-    assert len(set([v['name'] for v in matched.values()])) == 1
-    print(matched)
