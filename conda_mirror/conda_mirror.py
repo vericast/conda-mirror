@@ -1,20 +1,21 @@
 from __future__ import (unicode_literals, print_function, division,
                         absolute_import)
-import requests
+
 import argparse
-import logging
-import json
-import os
 import copy
+import json
+import logging
+import os
+import tarfile
+from collections import deque
+from glob import fnmatch
 from pprint import pformat
+
 import requests
 import tqdm
-from collections import deque
+import yaml
 from conda_build.config import Config
 from conda_build.index import update_index,read_index_tar
-import fnmatch
-import tarfile
-
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)-15s %(message)s')
@@ -27,6 +28,33 @@ DEFAULT_PLATFORMS = ['linux-64',
                      'osx-64',
                      'win-64',
                      'win-32']
+
+
+def match(all_packages, kv_iter):
+    """
+
+    Parameters
+    ----------
+    all_packages : iterable
+        Iterable of package metadata dicts from repodata.json
+    kv_iter : iterable of kv pairs
+        Iterable of (key, glob_value)
+
+    Returns
+    -------
+    matched : dict
+        Iterable of package metadata dicts which match the `target_packages`
+        (key, glob_value) tuples
+    """
+    matched = dict()
+    for pkg_name, pkg_info in all_packages.items():
+        for key, glob in kv_iter:
+            # normalize the strings so that comparisons are easier
+            name = str(pkg_info.get(key, '')).lower()
+            pattern = glob.lower()
+            if fnmatch.fnmatch(name, pattern):
+                matched.update({pkg_name: pkg_info})
+    return matched
 
 
 def get_repodata(channel, platform):
@@ -63,18 +91,20 @@ def _make_arg_parser():
 
     ap.add_argument(
         '--upstream-channel',
-        help='The anaconda channel to mirror'
+        help='The anaconda channel to mirror',
+        required=True
     )
     ap.add_argument(
         '--target-directory',
-        help='The place where packages should be mirrored to'
+        help='The place where packages should be mirrored to',
+        required=True
     )
     ap.add_argument(
         '--platform',
         nargs="+",
         help=("The OS platform(s) to mirror. one or more of: {'all',"
               " 'linux-64', 'linux-32', 'osx-64', 'win-32', 'win-64'}"),
-        default=[],
+        required=True
     )
     ap.add_argument(
         '-v', '--verbose',
@@ -82,7 +112,24 @@ def _make_arg_parser():
         help="This basically turns on tqdm progress bars for downloads",
         default=False,
     )
-
+    ap.add_argument(
+        '--config',
+        action="store",
+        help="Path to the yaml config file",
+    )
+    ap.add_argument(
+        '--blacklist',
+        action="+",
+        help="k:v pairs to match against to then blacklist from the mirroirng",
+        default=[]
+    )
+    ap.add_argument(
+        '--whitelist',
+        action="+",
+        help=("k:v pairs to match against to then whitelist from the mirroring."
+              "Note that whitelist supercedes blacklist"),
+        default=[]
+    )
     return ap
 
 
@@ -90,12 +137,20 @@ def cli():
     """
     Collect arguments from sys.argv and invoke the main() function.
     """
-    ap = _make_arg_parser()
-    args = ap.parse_args()
-    if 'all' in args.platform and len(args.platform) != 1:
-        logging.warning("If you pass 'all' as a platform option, all other "
-                        "options will be ignored")
-    main(args.upstream_channel, args.target_directory, args.platform, args.verbose)
+    parser = _make_arg_parser()
+    args = parser.parse_args()
+    config_dict = {}
+    if args.config:
+        logging.info("Loading config from %s", args.config)
+        with open(args.config, 'r') as f:
+            config_dict = yaml.load(f)
+        logging.info("config: %s", config_dict)
+
+    blacklist = config_dict.get('blacklist')
+    whitelist = config_dict.get('whitelit')
+
+    main2(args.upstream_channel, args.target_directory, args.platform,
+          blacklist, whitelist, args.verbose)
 
 
 def not_in_upstream(local_repo_metadata, upstream_repo_metadata):
@@ -174,8 +229,105 @@ def not_blacklisted_license(package_names_to_mirror, upstream_repo_metadata,
             yield pkg
 
 
-def main2(upstream_channel, target_directory, platform, blacklist=None, whitelist=None, verbose=False):
 
+def download(url, target_directory, filename, chunk_size=None):
+    if chunk_size is None:
+        chunk_size = 1024  # 1KB chunks
+    logging.info("download_url=%s", url)
+    with open(os.path.join(target_directory, filename), 'wb') as f:
+        logging.info("Downloading %s", filename)
+        ret = requests.get(url, stream=True)
+        iterator = ret.iter_content(chunk_size)
+        for data in iterator:
+            f.write(data)
+
+
+def pseudocode(upstream_channel, target_directory, platform, blacklist=None, whitelist=None, verbose=False):
+    # get repodata from upstream channel
+    # match blacklist conditions
+    # split upstream repodata into blacklist, not-blacklist
+    # match whitelist on blacklist
+    # make final mirror list of not-blacklist + whitelist
+    # get list of current packages in folder
+    # if any are not in the final mirror list, remove them
+    # do the set difference of what is local and what is in the final mirror list
+    # mirror all new packages
+    pass
+
+def main2(upstream_channel, target_directory, platform, blacklist=None, whitelist=None, verbose=False):
+    """
+    The business logic of conda_mirror.
+
+    Parameters
+    ----------
+    upstream_channel : str
+        The anaconda.org channel that you want to mirror locally
+        e.g., "anaconda" or "conda-forge"
+    target_directory : str
+        The path on disk to produce a local mirror of the upstream channel
+    platform : iterable
+        The platforms that you want to mirror from anaconda.org/<upstream_channel>
+        The defaults are listed in the module level global "DEFAULT_PLATFORMS"
+    verbose : bool
+        Increase chattiness of conda-mirror
+    """
+    full_platform_list = copy.copy(platform)
+    if 'all' in full_platform_list:
+        full_platform_list.remove('all')
+        full_platform_list = sorted(set(full_platform_list + DEFAULT_PLATFORMS))
+
+    # make sure the target directory structure is in place
+    if not os.path.exists(target_directory):
+        logging.info("Making directory: %s", target_directory)
+        os.makedirs(target_directory)
+    for platform in full_platform_list:
+        platform_directory = os.path.join(target_directory, platform)
+        if not os.path.exists(platform_directory):
+            logging.info("Making directory: %s", target_directory)
+            os.makedirs(platform_directory)
+
+    logging.info("Going to look on %s for the following platforms: %s"
+                 "", upstream_channel, full_platform_list)
+
+
+    mirrored_packages = deque()
+    # iterate over each platform in the upstream channel
+    for platform in full_platform_list:
+        upstream_repo_info, upstream_repo_packages = get_repodata(upstream_channel, platform)
+        platform_directory = os.path.join(target_directory, platform)
+        repodata_file = os.path.join(platform_directory, 'repodata.json')
+        if not os.path.exists(repodata_file):
+            run_conda_index(platform_directory)
+        with open(repodata_file, 'r') as f:
+            j = json.load(f)
+            local_repo_info = j.get('info', {})
+            local_repo_packages = j.get('packages', {})
+
+        packages_to_mirror = not_in_upstream(local_repo_packages,
+                                             upstream_repo_packages)
+        packages_to_mirror = not_blacklisted_license(packages_to_mirror,
+                                                     upstream_repo_packages)
+
+        for idx, package in enumerate(packages_to_mirror):
+            mirrored_packages.append((platform, package))
+            info = upstream_repo_packages[package]
+            url = DOWNLOAD_URL.format(
+                channel=upstream_channel,
+                name=info['name'],
+                version=info['version'],
+                platform=platform,
+                file_name=package,
+            )
+            if idx % 5 == 0:
+                # intermittently run conda index so that, in case of failure,
+                # not all downloads need to be repeated
+                run_conda_index(os.path.join(target_directory, platform))
+
+        # also run conda index at the end of the job
+        run_conda_index(os.path.join(target_directory, platform))
+    logging.info("Done mirroring.")
+    logging.info("The packages that were mirrored are:")
+    logging.info(pformat(mirrored_packages))
 
 def main(upstream_channel, target_directory, platform, verbose=False):
     """
