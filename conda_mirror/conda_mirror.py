@@ -30,14 +30,14 @@ DEFAULT_PLATFORMS = ['linux-64',
                      'win-32']
 
 
-def match(all_packages, kv_iter):
+def match(all_packages, key_glob_iter):
     """
 
     Parameters
     ----------
     all_packages : iterable
         Iterable of package metadata dicts from repodata.json
-    kv_iter : iterable of kv pairs
+    key_glob_iter : iterable of kv pairs
         Iterable of (key, glob_value)
 
     Returns
@@ -48,12 +48,13 @@ def match(all_packages, kv_iter):
     """
     matched = dict()
     for pkg_name, pkg_info in all_packages.items():
-        for key, glob in kv_iter:
+        for key, glob in key_glob_iter:
             # normalize the strings so that comparisons are easier
             name = str(pkg_info.get(key, '')).lower()
             pattern = glob.lower()
             if fnmatch.fnmatch(name, pattern):
                 matched.update({pkg_name: pkg_info})
+
     return matched
 
 
@@ -242,17 +243,97 @@ def download(url, target_directory, filename, chunk_size=None):
             f.write(data)
 
 
-def pseudocode(upstream_channel, target_directory, platform, blacklist=None, whitelist=None, verbose=False):
+def pseudocode(upstream_channel, target_directory, platform, blacklist=None,
+               whitelist=None, verbose=False):
+    """
+
+    Parameters
+    ----------
+    upstream_channel : str
+        The anaconda.org channel that you want to mirror locally
+        e.g., "anaconda" or "conda-forge"
+    target_directory : str
+        The path on disk to produce a local mirror of the upstream channel.
+        Note that this is the directory that contains the platform
+        subdirectories.
+    platform : str
+        The platform that you want to mirror from
+        anaconda.org/<upstream_channel>
+        The options are listed in the module level global "DEFAULT_PLATFORMS"
+    blacklist : iterable of tuples
+        The values of blacklist should be (key, glob) where key is one of the
+        keys in the repodata['packages'] dicts and glob is a thing to match
+        on.  Note that all comparisons will be laundered through lowercasing.
+    whitelist : iterable of tuples
+        The values of blacklist should be (key, glob) where key is one of the
+        keys in the repodata['packages'] dicts and glob is a thing to match
+        on.  Note that all comparisons will be laundered through lowercasing.
+    verbose : bool
+        Increase chattiness of conda-mirror
+
+    Notes
+    -----
+    the repodata['packages'] dictionary is formatted like this:
+
+    keys are filenames, e.g.:
+    tk-8.5.18-0.tar.bz2
+
+    values are dictionaries, e.g.:
+    {'arch': 'x86_64',
+     'binstar': {'channel': 'main',
+                 'owner_id': '55fc8527d3234d09d4951c71',
+                 'package_id': '56380a159c73330b8ae858b8'},
+     'build': '0',
+     'build_number': 0,
+     'date': '2015-03-16',
+     # depends is the legacy key for old versions of conda
+     'depends': [],
+     'license': 'BSD-like',
+     'license_family': 'BSD',
+     'md5': '902f0fd689a01a835c9e69aefbe58fdd',
+     'name': 'tk',
+     'platform': 'linux',
+     # requires is the new key that specifies the package requirements
+     old versions of conda
+     'requires': [],
+     'size': 1960193,
+     'version': '8.5.18'}
+    """
+    blacklist_packages = {}
+    whitelist_packages = {}
     # get repodata from upstream channel
+    repodata = get_repodata(upstream_channel, platform)
+    upstream_packages = repodata.get('packages', {})
     # match blacklist conditions
-    # split upstream repodata into blacklist, not-blacklist
+    if blacklist:
+        blacklist_packages = match(upstream_packages, blacklist)
     # match whitelist on blacklist
+    if whitelist:
+        whitelist_packages = match(upstream_packages, whitelist)
     # make final mirror list of not-blacklist + whitelist
+    true_blacklist = set(blacklist_packages.keys()) - set(
+        whitelist_packages.keys())
+    possible_packages_to_mirror = set(upstream_packages.keys()) - true_blacklist
     # get list of current packages in folder
+
+    def list_dir(local_dir):
+        contents = os.listdir(local_dir)
+        local_packages = fnmatch.filter(contents, "*.tar.bz2")
+
+    local_directory = os.path.join(target_directory, platform)
+    local_packages = list_dir(local_directory, "*.tar.bz2")
     # if any are not in the final mirror list, remove them
-    # do the set difference of what is local and what is in the final mirror list
+    for package_name in local_packages:
+        if package_name in true_blacklist:
+            _remove_package(os.path.join(local_directory, package_name))
+    # do the set difference of what is local and what is in the final
+    local_packages = list_dir(local_directory, "*.tar.bz2")
+    to_mirror = possible_packages_to_mirror - set(local_packages)
+
+    # mirror list
     # mirror all new packages
     pass
+
 
 def main2(upstream_channel, target_directory, platform, blacklist=None, whitelist=None, verbose=False):
     """
