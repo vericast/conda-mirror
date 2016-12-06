@@ -6,6 +6,8 @@ import copy
 import json
 import logging
 import os
+import pdb
+import sys
 import tarfile
 from collections import deque
 from glob import fnmatch
@@ -17,8 +19,10 @@ import yaml
 from conda_build.config import Config
 from conda_build.index import update_index,read_index_tar
 
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)-15s %(message)s')
+
+logger = None
+
+
 DEFAULT_BAD_LICENSES = ['agpl', '']
 
 DOWNLOAD_URL="https://anaconda.org/{channel}/{name}/{version}/download/{platform}/{file_name}"
@@ -30,15 +34,15 @@ DEFAULT_PLATFORMS = ['linux-64',
                      'win-32']
 
 
-def match(all_packages, key_glob_iter):
+def match(all_packages, key_glob_dict):
     """
 
     Parameters
     ----------
     all_packages : iterable
         Iterable of package metadata dicts from repodata.json
-    key_glob_iter : iterable of kv pairs
-        Iterable of (key, glob_value)
+    key_glob_dict : iterable of kv pairs
+        Iterable of (key, glob_value) dicts
 
     Returns
     -------
@@ -48,7 +52,7 @@ def match(all_packages, key_glob_iter):
     """
     matched = dict()
     for pkg_name, pkg_info in all_packages.items():
-        for key, glob in key_glob_iter:
+        for glob, key in key_glob_dict.items():
             # normalize the strings so that comparisons are easier
             name = str(pkg_info.get(key, '')).lower()
             pattern = glob.lower()
@@ -102,9 +106,8 @@ def _make_arg_parser():
     )
     ap.add_argument(
         '--platform',
-        nargs="+",
-        help=("The OS platform(s) to mirror. one or more of: {'all',"
-              " 'linux-64', 'linux-32', 'osx-64', 'win-32', 'win-64'}"),
+        help=("The OS platform(s) to mirror. one of: {'linux-64', 'linux-32',"
+              "'osx-64', 'win-32', 'win-64'}"),
         required=True
     )
     ap.add_argument(
@@ -119,17 +122,10 @@ def _make_arg_parser():
         help="Path to the yaml config file",
     )
     ap.add_argument(
-        '--blacklist',
-        action="+",
-        help="k:v pairs to match against to then blacklist from the mirroirng",
-        default=[]
-    )
-    ap.add_argument(
-        '--whitelist',
-        action="+",
-        help=("k:v pairs to match against to then whitelist from the mirroring."
-              "Note that whitelist supercedes blacklist"),
-        default=[]
+        '--pdb',
+        action="store_true",
+        help="Enable PDB debugging on exception",
+        default=False,
     )
     return ap
 
@@ -140,19 +136,32 @@ def cli():
     """
     parser = _make_arg_parser()
     args = parser.parse_args()
+
+    loglevel = logging.INFO
+    if args.verbose:
+        loglevel = logging.DEBUG
+
+    global logger
+    logger = logging.getLogger('conda_mirror')
+    logger.setLevel(loglevel)
+
+    if args.pdb:
+        # set the pdb_hook as the except hook for all exceptions
+        def pdb_hook(exctype, value, traceback):
+            pdb.post_mortem(traceback)
+        sys.excepthook = pdb_hook
+
     config_dict = {}
     if args.config:
-        logging.info("Loading config from %s", args.config)
+        logger.info("Loading config from %s", args.config)
         with open(args.config, 'r') as f:
             config_dict = yaml.load(f)
-        logging.info("config: %s", config_dict)
-
+        logger.info("config: %s", config_dict)
     blacklist = config_dict.get('blacklist')
     whitelist = config_dict.get('whitelit')
 
-    main2(args.upstream_channel, args.target_directory, args.platform,
-          blacklist, whitelist, args.verbose)
-
+    pseudocode(args.upstream_channel, args.target_directory, args.platform,
+               blacklist, whitelist, args.verbose)
 
 def not_in_upstream(local_repo_metadata, upstream_repo_metadata):
     """
@@ -215,28 +224,27 @@ def not_blacklisted_license(package_names_to_mirror, upstream_repo_metadata,
     upstream_package_names = list(upstream_repo_metadata.keys())
 
     for pkg in package_names_to_mirror:
-        logging.info('checking if {} has a bad license'.format(pkg))
+        logger.info('checking if {} has a bad license'.format(pkg))
         pkg_info = upstream_repo_metadata[pkg]
         pkg_license = pkg_info.get('license') or ''
         if none_is_bad and not pkg_license:
-            logging.error("Will not mirror {} because it has no license listed")
+            logger.error("Will not mirror {} because it has no license listed")
             continue
         for license in bad_licenses:
             if pkg_license.lower() == license:
-                logging.error("Not going to mirror {} because it's license is "
+                logger.error("Not going to mirror {} because it's license is "
                               "not friendly: {}".format(pkg, license))
                 break
         else:
             yield pkg
 
 
-
-def download(url, target_directory, filename, chunk_size=None):
+def download(url, filename, chunk_size=None):
     if chunk_size is None:
         chunk_size = 1024  # 1KB chunks
-    logging.info("download_url=%s", url)
-    with open(os.path.join(target_directory, filename), 'wb') as f:
-        logging.info("Downloading %s", filename)
+    logger.info("download_url=%s", url)
+    with open(filename, 'wb') as f:
+        logger.info("Downloading to %s", filename)
         ret = requests.get(url, stream=True)
         iterator = ret.iter_content(chunk_size)
         for data in iterator:
@@ -302,37 +310,64 @@ def pseudocode(upstream_channel, target_directory, platform, blacklist=None,
     blacklist_packages = {}
     whitelist_packages = {}
     # get repodata from upstream channel
-    repodata = get_repodata(upstream_channel, platform)
-    upstream_packages = repodata.get('packages', {})
+    info, upstream_packages = get_repodata(upstream_channel, platform)
     # match blacklist conditions
     if blacklist:
+        logger.debug("blacklist")
         blacklist_packages = match(upstream_packages, blacklist)
+        logger.info(pformat(list(blacklist_packages)))
     # match whitelist on blacklist
     if whitelist:
+        logger.debug("whitelist")
         whitelist_packages = match(upstream_packages, whitelist)
+        logger.info(pformat(list(whitelist_packages)))
     # make final mirror list of not-blacklist + whitelist
     true_blacklist = set(blacklist_packages.keys()) - set(
         whitelist_packages.keys())
+    logger.debug('true blacklist')
+    logger.debug(pformat(whitelist_packages))
     possible_packages_to_mirror = set(upstream_packages.keys()) - true_blacklist
-    # get list of current packages in folder
+    logger.debug('possible_packages_to_mirror')
+    logger.debug(pformat(possible_packages_to_mirror))
 
     def list_dir(local_dir):
         contents = os.listdir(local_dir)
-        local_packages = fnmatch.filter(contents, "*.tar.bz2")
+        return fnmatch.filter(contents, "*.tar.bz2")
 
     local_directory = os.path.join(target_directory, platform)
-    local_packages = list_dir(local_directory, "*.tar.bz2")
+    # validate all packages in directory
+    run_conda_index(local_directory)
+    logger.debug('removing repodata.json from %s' % local_directory)
+    os.remove(os.path.join(local_directory, 'repodata.json'))
+    logger.debug('removing repodata.json from %s' % local_directory)
+    os.remove(os.path.join(local_directory, 'repodata.json.bz2'))
+
+    # get list of current packages in folder
+    local_packages = list_dir(local_directory)
     # if any are not in the final mirror list, remove them
     for package_name in local_packages:
         if package_name in true_blacklist:
             _remove_package(os.path.join(local_directory, package_name))
     # do the set difference of what is local and what is in the final
-    local_packages = list_dir(local_directory, "*.tar.bz2")
-    to_mirror = possible_packages_to_mirror - set(local_packages)
-
     # mirror list
+    local_packages = list_dir(local_directory)
+    to_mirror = possible_packages_to_mirror - set(local_packages)
+    logger.debug(to_mirror)
+    logger.debug(pformat(to_mirror))
     # mirror all new packages
-    pass
+    for package_name in sorted(to_mirror):
+        url = DOWNLOAD_URL.format(
+            channel=upstream_channel,
+            name=upstream_packages[package_name]['name'],
+            version=upstream_packages[package_name]['version'],
+            platform=platform,
+            file_name=package_name)
+        download(url, os.path.join(local_directory, package_name))
+
+    download(REPODATA.format(channel=upstream_channel, platform=platform))
+    download(REPODATA.format(channel=upstream_channel, platform=platform) +
+             ".bz2")
+
 
 
 def main2(upstream_channel, target_directory, platform, blacklist=None, whitelist=None, verbose=False):
@@ -359,15 +394,15 @@ def main2(upstream_channel, target_directory, platform, blacklist=None, whitelis
 
     # make sure the target directory structure is in place
     if not os.path.exists(target_directory):
-        logging.info("Making directory: %s", target_directory)
+        logger.info("Making directory: %s", target_directory)
         os.makedirs(target_directory)
     for platform in full_platform_list:
         platform_directory = os.path.join(target_directory, platform)
         if not os.path.exists(platform_directory):
-            logging.info("Making directory: %s", target_directory)
+            logger.info("Making directory: %s", target_directory)
             os.makedirs(platform_directory)
 
-    logging.info("Going to look on %s for the following platforms: %s"
+    logger.info("Going to look on %s for the following platforms: %s"
                  "", upstream_channel, full_platform_list)
 
 
@@ -406,9 +441,9 @@ def main2(upstream_channel, target_directory, platform, blacklist=None, whitelis
 
         # also run conda index at the end of the job
         run_conda_index(os.path.join(target_directory, platform))
-    logging.info("Done mirroring.")
-    logging.info("The packages that were mirrored are:")
-    logging.info(pformat(mirrored_packages))
+    logger.info("Done mirroring.")
+    logger.info("The packages that were mirrored are:")
+    logger.info(pformat(mirrored_packages))
 
 def main(upstream_channel, target_directory, platform, verbose=False):
     """
@@ -434,15 +469,15 @@ def main(upstream_channel, target_directory, platform, verbose=False):
 
     # make sure the target directory structure is in place
     if not os.path.exists(target_directory):
-        logging.info("Making directory: {}".format(target_directory))
+        logger.info("Making directory: {}".format(target_directory))
         os.makedirs(target_directory)
     for platform in full_platform_list:
         dir = os.path.join(target_directory, platform)
         if not os.path.exists(dir):
-            logging.info("Making directory: {}".format(target_directory))
+            logger.info("Making directory: {}".format(target_directory))
             os.makedirs(dir)
 
-    logging.info("Going to look on {} for the following platforms: {}"
+    logger.info("Going to look on {} for the following platforms: {}"
                  "".format(upstream_channel, full_platform_list))
 
     mirrored_packages = deque()
@@ -473,12 +508,12 @@ def main(upstream_channel, target_directory, platform, verbose=False):
                 platform=platform,
                 file_name=package,
             )
-            logging.info("download_url={}".format(url))
+            logger.info("download_url={}".format(url))
             expected_size = info['size']
             chunk_size = 1024  # 1KB chunks
             expected_iterations = expected_size // chunk_size + 1
             with open(os.path.join(target_directory, platform, package), 'wb') as f:
-                logging.info("Downloading {}".format(package))
+                logger.info("Downloading {}".format(package))
                 ret = requests.get(url, stream=True)
                 iterator = ret.iter_content(chunk_size)
                 if verbose:
@@ -495,9 +530,9 @@ def main(upstream_channel, target_directory, platform, verbose=False):
 
         # also run conda index at the end of the job
         run_conda_index(os.path.join(target_directory, platform))
-    logging.info("Done mirroring.")
-    logging.info("The packages that were mirrored are:")
-    logging.info(pformat(mirrored_packages))
+    logger.info("Done mirroring.")
+    logger.info("The packages that were mirrored are:")
+    logger.info(pformat(mirrored_packages))
 
 
 def run_conda_index(target_directory):
@@ -511,7 +546,7 @@ def run_conda_index(target_directory):
         channel. The directory at this path should contain a "repodata.json" file
         e.g., /path/to/local/repo/linux-64
     """
-    logging.info("Indexing {}".format(target_directory))
+    logger.info("Indexing {}".format(target_directory))
     config = Config()
     config.timeout = 1
     try:
@@ -524,8 +559,8 @@ def run_conda_index(target_directory):
         # and drop the trailing '.'
         if fname.endswith('.'):
             fname = fname[:-1]
-        logging.info("Caught an exception while trying to index: {}".format(re))
-        logging.info("Removing: {}".format(fname))
+        logger.info("Caught an exception while trying to index: {}".format(re))
+        logger.info("Removing: {}".format(fname))
         _remove_package(fname)
         run_conda_index(target_directory)
     except tarfile.ReadError as re:
@@ -553,8 +588,10 @@ def _find_bad_package(local_platform_directory):
         raising a tarfile.ReadError
     """
     repodata_fname = os.path.join(local_platform_directory, 'repodata.json')
-    with open(repodata_fname, 'r') as f:
-        repodata = json.load(f)
+    repodata = {'info': {}, 'packages': {}}
+    if os.path.exists(repodata_fname):
+        with open(repodata_fname, 'r') as f:
+            repodata = json.load(f)
     repodata_info, repodata_packages = repodata.get('info', {}), repodata.get('packages', {})
     indexed_packages = list(repodata_packages.keys())
     all_packages = fnmatch.filter(os.listdir(local_platform_directory), "*.tar.bz2")
@@ -566,7 +603,7 @@ def _find_bad_package(local_platform_directory):
         except tarfile.ReadError as re:
             msg = "tarfile.ReadError encountered. Original error: {}".format(re)
             msg += "\nRemoving bad package: {}".format(full_pkg_path)
-            logging.error(msg)
+            logger.error(msg)
             yield full_pkg_path
 
 
@@ -579,7 +616,7 @@ def _remove_package(pkg_path):
     pkg_path : str
         Path to a conda package that should be removed
     """
-    logging.info("Removing: {}".format(pkg_path))
+    logger.info("Removing: {}".format(pkg_path))
     os.remove(pkg_path)
 
 
