@@ -2,22 +2,19 @@ from __future__ import (unicode_literals, print_function, division,
                         absolute_import)
 
 import argparse
-import copy
 import json
 import logging
 import os
 import pdb
 import sys
 import tarfile
-from collections import deque
 from glob import fnmatch
 from pprint import pformat
 
 import requests
-import tqdm
 import yaml
 from conda_build.config import Config
-from conda_build.index import update_index,read_index_tar
+from conda_build.index import update_index, read_index_tar
 
 
 logger = None

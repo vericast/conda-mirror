@@ -1,7 +1,6 @@
 from setuptools import setup, find_packages
 import versioneer
 
-
 setup(
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
@@ -15,7 +14,8 @@ setup(
     license='BSD 3-Clause',
     install_requires=[
         'requests',
-        'tqdm'
+        'pyyaml',
+        'conda-build',
     ],
     entry_points={
         "console_scripts": [
