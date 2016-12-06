@@ -1,7 +1,8 @@
 import pytest
 
-from conda_mirror import resolve
+from conda_mirror.conda_mirror import match
 from conda_mirror.conda_mirror import get_repodata
+
 
 @pytest.fixture(scope='module')
 def repodata():
@@ -10,5 +11,5 @@ def repodata():
 
 def test_match(repodata):
     repodata_info, repodata_packages = repodata
-    matched = resolve.match(repodata_packages, {'name': 'jupyter'})
+    matched = match(repodata_packages, {'jupyter': 'name'})
     assert set([v['name'] for v in matched.values()]) == set(['jupyter'])
