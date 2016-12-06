@@ -51,13 +51,20 @@ def match(all_packages, key_glob_dict):
         (key, glob_value) tuples
     """
     matched = dict()
+    key_glob_dict = {key.lower(): glob.lower()
+                     for key, glob
+                     in key_glob_dict.items()}
     for pkg_name, pkg_info in all_packages.items():
-        for glob, key in key_glob_dict.items():
-            # normalize the strings so that comparisons are easier
+        matched_all = []
+        # normalize the strings so that comparisons are easier
+        for key, pattern in key_glob_dict.items():
             name = str(pkg_info.get(key, '')).lower()
-            pattern = glob.lower()
             if fnmatch.fnmatch(name, pattern):
-                matched.update({pkg_name: pkg_info})
+                matched_all.append(True)
+            else:
+                matched_all.append(False)
+        if all(matched_all):
+            matched.update({pkg_name: pkg_info})
 
     return matched
 
@@ -134,16 +141,18 @@ def cli():
     """
     Collect arguments from sys.argv and invoke the main() function.
     """
-    parser = _make_arg_parser()
-    args = parser.parse_args()
-
     loglevel = logging.INFO
-    if args.verbose:
-        loglevel = logging.DEBUG
-
     global logger
     logger = logging.getLogger('conda_mirror')
     logger.setLevel(loglevel)
+
+    print(sys.argv)
+    parser = _make_arg_parser()
+    args = parser.parse_args()
+
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+
 
     if args.pdb:
         # set the pdb_hook as the except hook for all exceptions
@@ -158,10 +167,10 @@ def cli():
             config_dict = yaml.load(f)
         logger.info("config: %s", config_dict)
     blacklist = config_dict.get('blacklist')
-    whitelist = config_dict.get('whitelit')
+    whitelist = config_dict.get('whitelist')
 
     main(args.upstream_channel, args.target_directory, args.platform,
-         blacklist, whitelist, args.verbose)
+         blacklist, whitelist)
 
 
 def download(url, filename, chunk_size=None):
@@ -177,7 +186,7 @@ def download(url, filename, chunk_size=None):
 
 
 def main(upstream_channel, target_directory, platform, blacklist=None,
-         whitelist=None, verbose=False):
+         whitelist=None):
     """
 
     Parameters
@@ -239,13 +248,19 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
     # match blacklist conditions
     if blacklist:
         logger.debug("blacklist")
-        blacklist_packages = match(upstream_packages, blacklist)
-        logger.info(pformat(list(blacklist_packages)))
+        blacklist_packages = {}
+        for blist in blacklist:
+            matched_packages = match(upstream_packages, blist)
+            blacklist_packages.update(matched_packages)
+        logger.debug(pformat(list(blacklist_packages)))
     # match whitelist on blacklist
     if whitelist:
         logger.debug("whitelist")
-        whitelist_packages = match(upstream_packages, whitelist)
-        logger.info(pformat(list(whitelist_packages)))
+        whitelist_packages = {}
+        for wlist in whitelist:
+            matched_packages = match(upstream_packages, wlist)
+            whitelist_packages.update(matched_packages)
+        logger.debug(pformat(list(whitelist_packages)))
     # make final mirror list of not-blacklist + whitelist
     true_blacklist = set(blacklist_packages.keys()) - set(
         whitelist_packages.keys())
@@ -277,8 +292,8 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
     # mirror list
     local_packages = list_dir(local_directory)
     to_mirror = possible_packages_to_mirror - set(local_packages)
-    logger.debug(to_mirror)
-    logger.debug(pformat(to_mirror))
+    logger.info('to_mirror')
+    logger.info(pformat(to_mirror))
     # mirror all new packages
     for package_name in sorted(to_mirror):
         url = DOWNLOAD_URL.format(
@@ -289,9 +304,12 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
             file_name=package_name)
         download(url, os.path.join(local_directory, package_name))
 
-    download(REPODATA.format(channel=upstream_channel, platform=platform))
-    download(REPODATA.format(channel=upstream_channel, platform=platform) +
-             ".bz2")
+    download(filename='repodata.json',
+             url=REPODATA.format(channel=upstream_channel,
+                                 platform=platform))
+    download(filename='repodata.json.bz2',
+             url=REPODATA.format(channel=upstream_channel,
+                                 platform=platform)+".bz2")
 
 
 def run_conda_index(target_directory):
