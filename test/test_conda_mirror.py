@@ -4,6 +4,8 @@ import copy
 import sys
 from conda_mirror import conda_mirror
 from collections import namedtuple
+import os
+import bz2
 
 @pytest.fixture(scope='module')
 def repodata():
@@ -48,3 +50,20 @@ whitelist:
     sys.argv = cli_args.split(' ')
     conda_mirror.cli()
     sys.argv = old_argv
+
+
+def test_handling_bad_package(tmpdir):
+    local_repo_root = tmpdir.mkdir('repo').strpath
+    bad_pkg_root = os.path.join(local_repo_root, 'linux-64')
+    os.makedirs(bad_pkg_root)
+    bad_pkg_name = 'bad-1-0.tar.bz2'
+    bad_pkg_path = os.path.join(bad_pkg_root, bad_pkg_name)
+
+    if os.path.exists(bad_pkg_path):
+        os.remove(bad_pkg_path)
+
+    with bz2.BZ2File(bad_pkg_path, 'wb') as f:
+        f.write("This is a fake package".encode())
+    assert bad_pkg_name in os.listdir(bad_pkg_root)
+    conda_mirror.run_conda_index(bad_pkg_root)
+    assert bad_pkg_name not in os.listdir(bad_pkg_root)
