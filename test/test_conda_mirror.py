@@ -21,7 +21,8 @@ def test_match(repodata):
     matched = conda_mirror.match(repodata_packages, {'name': 'jupyter'})
     assert set([v['name'] for v in matched.values()]) == set(['jupyter'])
 
-    matched = conda_mirror.match
+    matched = conda_mirror.match(repodata_packages, {'name': "*"})
+    assert len(matched) == len(repodata_packages)
 
 @pytest.mark.parametrize(
     'channel,platform',
