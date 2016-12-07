@@ -1,6 +1,3 @@
 pytest
-requests
-requests-mock
-tqdm
 coverage
 pytest-ordering

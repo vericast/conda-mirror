@@ -15,7 +15,9 @@ install:
 - pip install -e .
 
 script:
-- ./run_tests
+- conda-mirror -h
+- coverage run run_tests.py
+- coverage report -m
 
 after_success:
 - codecov

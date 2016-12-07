@@ -1,137 +1,88 @@
-from __future__ import (unicode_literals, print_function, division, 
-                        absolute_import)
-from conda_mirror import conda_mirror
 import pytest
-import requests_mock
-import os
-import subprocess
-from contextlib import contextmanager
-import sys
-import bz2
+import itertools
 import copy
+import sys
+from conda_mirror import conda_mirror
+from collections import namedtuple
+import os
+import json
+import bz2
 
-@pytest.fixture(scope='session')
-def local_repo_root():
-    return os.path.join('test/local-repo')
-
-
-def ensure_local_repo(repo):
-    print("Regenerating local repo")
-    subprocess.check_call(('python regenerate-repodata.py %s' % repo).split())
-
-
-@pytest.mark.first
-def test_ensure_local_repo(local_repo_root):
-    if os.path.exists(local_repo_root):
-        pytest.skip("Don't need to regenerate repo. If you want to force "
-                    "regeneration, remove the 'test/local-repo' dir")
-    ensure_local_repo(local_repo_root)
-
-@contextmanager
-def conda_mock(platforms, repo):
-    channel = os.path.basename(repo)
-    with requests_mock.mock() as m:
-        for platform in platforms:
-            repodata = os.path.join(repo, platform, 'repodata.json')
-            with open(repodata, 'r') as f:
-                json_text = f.read()
-
-            mock_address = conda_mirror.REPODATA.format(
-                channel=channel,
-                platform=platform
-            )
-            # mock the info address
-            m.get(mock_address, text=json_text)
-            # now we need to mock the download addresses
-            repo_info, repo_package_data = conda_mirror.get_repodata(channel, platform)
-            for pkg_name, pkg_info in repo_package_data.items():
-                url = conda_mirror.DOWNLOAD_URL.format(
-                    channel=channel,
-                    name=pkg_info['name'],
-                    version=pkg_info['version'],
-                    platform=platform,
-                    file_name=pkg_name,
-                )
-                with open(os.path.join(repo, platform, pkg_name), 'rb') as f:
-                    data = f.read()
-                m.get(url, content=data)
-        yield
+@pytest.fixture(scope='module')
+def repodata():
+    rd = namedtuple('repodata', ['anaconda', 'condaforge'])
+    anaconda = conda_mirror.get_repodata('anaconda', 'linux-64')
+    cf = conda_mirror.get_repodata('conda-forge', 'linux-64')
+    return rd(anaconda, cf)
 
 
-@pytest.mark.parametrize('platform', conda_mirror.DEFAULT_PLATFORMS)
-def test_mirror_main(local_repo_root, platform, tmpdir):
-    with conda_mock([platform], local_repo_root):
-        channel = os.path.basename(local_repo_root)
-        mirror_test_dir = tmpdir.mkdir('mirror-test')
-        platform_dir = os.path.join(str(mirror_test_dir), platform)
-        os.mkdir(platform_dir)
-        repodata_file = os.path.join(platform_dir, 'repodata.json')
-        with open(repodata_file, 'w') as f:
-            f.write("{}")
-        conda_mirror.main(channel, str(mirror_test_dir), [platform])
-        # Make sure we mirror both files
-        downloaded_files = os.listdir(platform_dir)
-        assert "a-1-0.tar.bz2" in downloaded_files
-        assert "b-1-0.tar.bz2" in downloaded_files
-        # now lets remove one of them and try and mirror again
-        file_to_remove = "a-1-0.tar.bz2"
-        os.remove(os.path.join(platform_dir, file_to_remove))
-        # need to reindex the directory
-        conda_mirror.run_conda_index(platform_dir)
+def test_match(repodata):
+    repodata_info, repodata_packages = repodata.anaconda
+    matched = conda_mirror.match(repodata_packages, {'name': 'jupyter'})
+    assert set([v['name'] for v in matched.values()]) == set(['jupyter'])
 
-        assert file_to_remove not in os.listdir(platform_dir)
+    matched = conda_mirror.match(repodata_packages, {'name': "*"})
+    assert len(matched) == len(repodata_packages)
 
-        conda_mirror.main(channel, str(mirror_test_dir), [platform])
+@pytest.mark.parametrize(
+    'channel,platform',
+    itertools.product(['anaconda', 'conda-forge'], ['linux-64']))
+def test_cli(tmpdir, channel, platform):
+    info, packages = conda_mirror.get_repodata(channel, platform)
+    smallest_package = sorted(packages, key=lambda x: packages[x]['size'])[0]
+    f2 = tmpdir.mkdir('%s' % channel)
+    f1 = tmpdir.mkdir('conf').join('conf.yaml')
 
-        # Make sure we mirror both files
-        downloaded_files = os.listdir(platform_dir)
-        assert "a-1-0.tar.bz2" in downloaded_files
-        assert "b-1-0.tar.bz2" in downloaded_files
-        assert "c-1-0.tar.bz2" not in downloaded_files
-        assert "d-1-0.tar.bz2" not in downloaded_files
+    f1.write('''
+blacklist:
+    - name: "*"
+whitelist:
+    - name: {}
+      version: {}'''.format(
+            packages[smallest_package]['name'],
+            packages[smallest_package]['version']))
+    cli_args = ("conda-mirror"
+                " --config {config}"
+                " --upstream-channel {channel}"
+                " --target-directory {target_directory}"
+                " --platform {platform}"
+                " --pdb"
+                ).format(config=f1.strpath,
+                         channel=channel,
+                         target_directory=f2.strpath,
+                         platform=platform)
+    old_argv = copy.deepcopy(sys.argv)
+    sys.argv = cli_args.split(' ')
+    conda_mirror.cli()
+    sys.argv = old_argv
 
+    for f in ['repodata.json', 'repodata.json.bz2']:
+        # make sure the repodata file exists
+        assert f in os.listdir(os.path.join(f2.strpath, platform))
 
-def test_cli(local_repo_root, tmpdir):
-    with conda_mock(conda_mirror.DEFAULT_PLATFORMS, local_repo_root):
-        old_argv = copy.copy(sys.argv)
-        local_mirror = tmpdir.mkdir('cli-test')
-        for platform in conda_mirror.DEFAULT_PLATFORMS:
-            platform_dir = os.path.join(str(local_mirror), platform)
-            os.mkdir(platform_dir)
-            repodata_file = os.path.join(platform_dir, 'repodata.json')
-            with open(repodata_file, 'w') as f:
-                f.write("{}")
-
-        channel = os.path.basename(local_repo_root)
-        sys.argv = ['conda_mirror.py',
-                    '--upstream-channel', channel,
-                    '--target-directory', str(local_mirror),
-                    '--platform', 'all', 'linux-64']
-
-        conda_mirror.cli()
-
-        for platform in conda_mirror.DEFAULT_PLATFORMS:
-            platform_dir = os.path.join(str(local_mirror), platform)
-            contents = os.listdir(platform_dir)
-            assert "a-1-0.tar.bz2" in contents
-            assert "b-1-0.tar.bz2" in contents
-            assert "c-1-0.tar.bz2" not in contents
-            assert "d-1-0.tar.bz2" not in contents
+    # make sure the repodata contents are identical from what we fetched from
+    # upstream and what we wrote to disk
+    with open(os.path.join(f2.strpath, platform, 'repodata.json'), 'r') as f:
+        disk_repodata = json.load(f)
+    disk_info = disk_repodata.get('info', {})
+    assert len(disk_info) == len(info)
+    disk_packages = disk_repodata.get('packages', {})
+    assert len(disk_packages) == len(packages)
 
 
-def test_handling_bad_package(local_repo_root):
+def test_handling_bad_package(tmpdir):
+    # ensure that bad conda packages are actually removed by run_conda_index
+    local_repo_root = tmpdir.mkdir('repo').strpath
     bad_pkg_root = os.path.join(local_repo_root, 'linux-64')
+    os.makedirs(bad_pkg_root)
     bad_pkg_name = 'bad-1-0.tar.bz2'
     bad_pkg_path = os.path.join(bad_pkg_root, bad_pkg_name)
+
     if os.path.exists(bad_pkg_path):
         os.remove(bad_pkg_path)
-    
+
     with bz2.BZ2File(bad_pkg_path, 'wb') as f:
         f.write("This is a fake package".encode())
-    
     assert bad_pkg_name in os.listdir(bad_pkg_root)
-
     conda_mirror.run_conda_index(bad_pkg_root)
-
     assert bad_pkg_name not in os.listdir(bad_pkg_root)
-    
