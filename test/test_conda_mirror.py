@@ -5,6 +5,7 @@ import sys
 from conda_mirror import conda_mirror
 from collections import namedtuple
 import os
+import json
 import bz2
 
 @pytest.fixture(scope='module')
@@ -19,6 +20,8 @@ def test_match(repodata):
     repodata_info, repodata_packages = repodata.anaconda
     matched = conda_mirror.match(repodata_packages, {'name': 'jupyter'})
     assert set([v['name'] for v in matched.values()]) == set(['jupyter'])
+
+    matched = conda_mirror.match
 
 @pytest.mark.parametrize(
     'channel,platform',
@@ -38,21 +41,36 @@ whitelist:
             packages[smallest_package]['name'],
             packages[smallest_package]['version']))
     cli_args = ("conda-mirror"
-                " --config {}"
-                " --upstream-channel anaconda"
-                " --target-directory {}"
-                " --platform {}"
+                " --config {config}"
+                " --upstream-channel {channel}"
+                " --target-directory {target_directory}"
+                " --platform {platform}"
                 " --pdb"
-                ).format(f1.strpath,
-                         f2.strpath,
-                         platform)
+                ).format(config=f1.strpath,
+                         channel=channel,
+                         target_directory=f2.strpath,
+                         platform=platform)
     old_argv = copy.deepcopy(sys.argv)
     sys.argv = cli_args.split(' ')
     conda_mirror.cli()
     sys.argv = old_argv
 
+    for f in ['repodata.json', 'repodata.json.bz2']:
+        # make sure the repodata file exists
+        assert f in os.listdir(os.path.join(f2.strpath, platform))
+
+    # make sure the repodata contents are identical from what we fetched from
+    # upstream and what we wrote to disk
+    with open(os.path.join(f2.strpath, platform, 'repodata.json'), 'r') as f:
+        disk_repodata = json.load(f)
+    disk_info = disk_repodata.get('info', {})
+    assert len(disk_info) == len(info)
+    disk_packages = disk_repodata.get('packages', {})
+    assert len(disk_packages) == len(packages)
+
 
 def test_handling_bad_package(tmpdir):
+    # ensure that bad conda packages are actually removed by run_conda_index
     local_repo_root = tmpdir.mkdir('repo').strpath
     bad_pkg_root = os.path.join(local_repo_root, 'linux-64')
     os.makedirs(bad_pkg_root)

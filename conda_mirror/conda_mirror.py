@@ -301,10 +301,10 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
             file_name=package_name)
         download(url, os.path.join(local_directory, package_name))
 
-    download(filename='repodata.json',
+    download(filename=os.path.join(local_directory, 'repodata.json'),
              url=REPODATA.format(channel=upstream_channel,
                                  platform=platform))
-    download(filename='repodata.json.bz2',
+    download(filename=os.path.join(local_directory, 'repodata.json.bz2'),
              url=REPODATA.format(channel=upstream_channel,
                                  platform=platform)+".bz2")
 
