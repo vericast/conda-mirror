@@ -86,7 +86,9 @@ blacklist:
 ##### Mirror only python 3 packages
 ```yaml
 blacklist:
-    - build: "py2*"
+    - name: "*"
+whitelist:
+    - build: "*py3*"
 ```
 
 
