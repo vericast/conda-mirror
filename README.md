@@ -10,6 +10,86 @@ WARNING: Invoking this command will pull ~10GB and take at least an hour
 $ conda-mirror --upstream-channel conda-forge --target-directory local_mirror --platform linux-64
 ```
 
+## More Details
+
+### blacklist/whitelist configuration
+
+example-conf.yaml:
+
+```yaml
+blacklist:
+    - license: "*agpl*"
+    - license: None
+    - license: ""
+
+whitelist:
+    - name: system
+```
+
+`blacklist` removes package(s) that match the condition(s) listed from the
+upstream repodata.
+
+`whitelist` re-includes any package(s) from blacklist that match the
+whitelist conditions.
+
+blacklist and whitelist both take lists of dictionaries. The keys in the
+dictionary need to be values in the repodata.json metadata. The values are
+(unix) globs to match on. Go here for the full repodata of the upstream
+"defaults" channel:
+http://conda.anaconda.org/anaconda/linux-64/repodata.json
+
+Here are the contents of one of the entries in repodata['packages']
+```
+{'botocore-1.4.10-py34_0.tar.bz2': {'arch': 'x86_64',
+  'binstar': {'channel': 'main',
+   'owner_id': '55fc8527d3234d09d4951c71',
+   'package_id': '56b88ea1be1cc95a362b218e'},
+  'build': 'py34_0',
+  'build_number': 0,
+  'date': '2016-04-11',
+  'depends': ['docutils >=0.10',
+   'jmespath >=0.7.1,<1.0.0',
+   'python 3.4*',
+   'python-dateutil >=2.1,<3.0.0'],
+  'license': 'Apache',
+  'md5': 'b35a5c1240ba672e0d9d1296141e383c',
+  'name': 'botocore',
+  'platform': 'linux',
+  'requires': [],
+  'size': 1831799,
+  'version': '1.4.10'}}
+```
+
+See implementation details in the conda_mirror:match function for more 
+information.
+
+#### Common usage patterns
+##### Mirror **only** one specific package
+If you wanted to match exactly the botocore package listed above with your 
+config, then you could use the following configuration to first blacklist 
+**all** packages and then include just the botocore packages:
+ 
+```yaml
+blacklist:
+    - name: "*"
+whitelist:
+    - name: botocore
+      version: 1.4.10
+      build: py34_0
+```
+##### Mirror everything but agpl licenses
+```yaml
+blacklist:
+    - license: "*agpl*"
+```
+
+##### Mirror only python 3 packages
+```yaml
+blacklist:
+    - build: "py2*"
+```
+
+
 ## CLI
 ```
 $ conda-mirror -h
