@@ -1,24 +1,21 @@
 from __future__ import (unicode_literals, print_function, division,
                         absolute_import)
 
-import traceback
 import argparse
-import json
 import logging
 import os
 import pdb
+import shutil
+import subprocess
 import sys
 import tarfile
 import tempfile
-import shutil
+import traceback
 from glob import fnmatch
-import subprocess
 from pprint import pformat
 
 import requests
 import yaml
-from conda_build.config import Config
-from conda_build.index import update_index, read_index_tar
 
 
 logger = None

@@ -1,12 +1,14 @@
-import pytest
-import itertools
-import copy
-import sys
-from conda_mirror import conda_mirror
-from collections import namedtuple
-import os
-import json
 import bz2
+import copy
+import itertools
+import json
+import os
+import sys
+
+import pytest
+
+from conda_mirror import conda_mirror
+
 
 @pytest.fixture(scope='module')
 def repodata():
