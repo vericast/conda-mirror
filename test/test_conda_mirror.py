@@ -85,5 +85,5 @@ def test_handling_bad_package(tmpdir, repodata):
     with bz2.BZ2File(bad_pkg_path, 'wb') as f:
         f.write("This is a fake package".encode())
     assert bad_pkg_name in os.listdir(bad_pkg_root)
-    conda_mirror._validate_packages(repodata, local_repo_root)
+    conda_mirror._validate_packages(repodata, bad_pkg_root)
     assert bad_pkg_name not in os.listdir(bad_pkg_root)

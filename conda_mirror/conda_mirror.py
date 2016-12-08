@@ -252,11 +252,12 @@ def _validate_packages(repodata, package_directory):
         except KeyError:
             logging.info("%s is not in the upstream index. Removing..."
                          "", package)
-            _remove_package(package)
-        # validate the integrity of the package, the size of the package and
-        # its hashes
-        _validate(os.path.join(package_directory, package),
-                  md5=info.get('md5'), sha256=info.get('sha256'))
+            _remove_package(os.path.join(package_directory, package))
+        else:
+            # validate the integrity of the package, the size of the package and
+            # its hashes
+            _validate(os.path.join(package_directory, package),
+                      md5=info.get('md5'), sha256=info.get('sha256'))
 
 
 def main(upstream_channel, target_directory, platform, blacklist=None,
