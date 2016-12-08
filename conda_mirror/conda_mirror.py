@@ -143,6 +143,9 @@ def cli():
     global logger
     logger = logging.getLogger('conda_mirror')
     logger.setLevel(loglevel)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(loglevel)
+    logger.addHandler(stream_handler)
 
     print(sys.argv)
     parser = _make_arg_parser()
@@ -150,6 +153,7 @@ def cli():
 
     if args.verbose:
         logger.setLevel(logging.DEBUG)
+        stream_handler.setLevel(logging.DEBUG)
 
 
     if args.pdb:
@@ -322,6 +326,8 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
     # 8. download repodata.json and repodata.json.bz2
 
     # Implementation:
+    if not os.path.exists(os.path.join(target_directory, platform)):
+        os.makedirs(os.path.join(target_directory, platform))
     info, repodata = get_repodata(upstream_channel, platform)
     local_directory = os.path.join(target_directory, platform)
 

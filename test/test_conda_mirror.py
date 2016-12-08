@@ -79,12 +79,19 @@ def test_handling_bad_package(tmpdir, repodata):
     bad_pkg_root = os.path.join(local_repo_root, 'linux-64')
     os.makedirs(bad_pkg_root)
     bad_pkg_name = 'bad-1-0.tar.bz2'
-    bad_pkg_path = os.path.join(bad_pkg_root, bad_pkg_name)
 
-    if os.path.exists(bad_pkg_path):
-        os.remove(bad_pkg_path)
+    # Test removal functionality of packages that are not in the upstream
+    # repodata.json
+    with bz2.BZ2File(os.path.join(bad_pkg_root, bad_pkg_name), 'wb') as f:
+        f.write("This is a fake package".encode())
+    assert bad_pkg_name in os.listdir(bad_pkg_root)
+    conda_mirror._validate_packages(repodata, bad_pkg_root)
+    assert bad_pkg_name not in os.listdir(bad_pkg_root)
 
-    with bz2.BZ2File(bad_pkg_path, 'wb') as f:
+    # Test removal of broken packages that do exist in upstream repodata.json
+    anaconda_repodata = repodata['anaconda'][1]
+    bad_pkg_name = next(iter(anaconda_repodata.keys()))
+    with bz2.BZ2File(os.path.join(bad_pkg_root, bad_pkg_name), 'wb') as f:
         f.write("This is a fake package".encode())
     assert bad_pkg_name in os.listdir(bad_pkg_root)
     conda_mirror._validate_packages(repodata, bad_pkg_root)
