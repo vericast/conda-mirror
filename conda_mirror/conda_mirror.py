@@ -258,7 +258,8 @@ def _validate_packages(repodata, package_directory):
             # validate the integrity of the package, the size of the package and
             # its hashes
             _validate(os.path.join(package_directory, package),
-                      md5=info.get('md5'), sha256=info.get('sha256'))
+                      md5=info.get('md5'), sha256=info.get('sha256'),
+                      size=info.get('size'))
 
 
 def main(upstream_channel, target_directory, platform, blacklist=None,
