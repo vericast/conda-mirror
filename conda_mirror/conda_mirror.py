@@ -350,7 +350,7 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
         for blist in blacklist:
             matched_packages = _match(repodata, blist)
             blacklist_packages.update(matched_packages)
-        logger.debug(pformat(list(blacklist_packages)))
+        logger.debug(pformat(sorted(blacklist_packages)))
 
     # 3. un-blacklist packages that are actually whitelisted
     # match whitelist on blacklist
@@ -360,15 +360,15 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
         for wlist in whitelist:
             matched_packages = _match(repodata, wlist)
             whitelist_packages.update(matched_packages)
-        logger.debug(pformat(list(whitelist_packages)))
+        logger.debug(pformat(sorted(whitelist_packages)))
     # make final mirror list of not-blacklist + whitelist
     true_blacklist = set(blacklist_packages.keys()) - set(
         whitelist_packages.keys())
     logger.debug('true blacklist')
-    logger.debug(pformat(whitelist_packages))
+    logger.debug(pformat(sorted(whitelist_packages)))
     possible_packages_to_mirror = set(repodata.keys()) - true_blacklist
     logger.debug('possible_packages_to_mirror')
-    logger.debug(pformat(possible_packages_to_mirror))
+    logger.debug(pformat(sorted(possible_packages_to_mirror)))
 
     # 4. remove blacklisted packages
     # get list of current packages in folder
@@ -383,7 +383,7 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
     local_packages = _list_conda_packages(local_directory)
     to_mirror = possible_packages_to_mirror - set(local_packages)
     logger.info('to_mirror')
-    logger.info(pformat(to_mirror))
+    logger.info(pformat(sorted(to_mirror)))
 
     # 6. for each download:
     # a. download to temp file
