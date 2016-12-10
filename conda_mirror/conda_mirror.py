@@ -213,7 +213,7 @@ def _validate(filename, md5, sha256, size):
         logger.debug('sha256 check passed')
 
 
-def _download(url, target_directory, package_metadata, validate=True,
+def _download(url, target_directory, package_metadata=None, validate=True,
               chunk_size=None):
     if chunk_size is None:
         chunk_size = 1024  # 1KB chunks
@@ -227,11 +227,15 @@ def _download(url, target_directory, package_metadata, validate=True,
     target_filename = url.split('/')[-1]
     shutil.move(download_filename, target_filename)
     # do some validations
-    if validate:
+    if validate and package_metadata:
         _validate(target_filename,
                   md5=package_metadata.get('md5'),
                   sha256=package_metadata.get('sha256'),
                   size=package_metadata.get('size'))
+    else:
+        logging.info("Not validating %s because validate is %s and "
+                     "package_metadata is %s", target_filename, validate,
+                     package_metadata)
 
     shutil.move(target_filename,
                 os.path.join(target_directory, target_filename))
@@ -397,9 +401,9 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
 
     # 8. download repodata.json and repodata.json.bz2
     url = REPODATA.format(channel=upstream_channel, platform=platform)
-    _download(url, local_directory, repodata, validate=False)
+    _download(url, local_directory, validate=False)
     url = REPODATA.format(channel=upstream_channel, platform=platform) + ".bz2"
-    _download(url, local_directory, repodata, validate=False)
+    _download(url, local_directory, validate=False)
 
 
 if __name__ == "__main__":
