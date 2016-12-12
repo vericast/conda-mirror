@@ -2,19 +2,20 @@ from __future__ import (unicode_literals, print_function, division,
                         absolute_import)
 
 import argparse
-import json
 import logging
 import os
 import pdb
+import shutil
+import subprocess
 import sys
 import tarfile
+import tempfile
+import traceback
 from glob import fnmatch
 from pprint import pformat
 
 import requests
 import yaml
-from conda_build.config import Config
-from conda_build.index import update_index, read_index_tar
 
 
 logger = None
@@ -31,7 +32,7 @@ DEFAULT_PLATFORMS = ['linux-64',
                      'win-32']
 
 
-def match(all_packages, key_glob_dict):
+def _match(all_packages, key_glob_dict):
     """
 
     Parameters
@@ -142,6 +143,14 @@ def cli():
     global logger
     logger = logging.getLogger('conda_mirror')
     logger.setLevel(loglevel)
+    format_string = '%(levelname)s: %(message)s'
+    formatter = logging.Formatter(fmt=format_string)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(loglevel)
+    stream_handler.setFormatter(fmt=formatter)
+
+    logger.addHandler(stream_handler)
+
 
     print(sys.argv)
     parser = _make_arg_parser()
@@ -149,6 +158,7 @@ def cli():
 
     if args.verbose:
         logger.setLevel(logging.DEBUG)
+        stream_handler.setLevel(logging.DEBUG)
 
 
     if args.pdb:
@@ -170,16 +180,92 @@ def cli():
          blacklist, whitelist)
 
 
-def download(url, filename, chunk_size=None):
+def _remove_package(pkg_path):
+    """
+    Log and remove a package.
+
+    Parameters
+    ----------
+    pkg_path : str
+        Path to a conda package that should be removed
+    """
+    logger.info("Removing: {}".format(pkg_path))
+    os.remove(pkg_path)
+
+
+def _validate(filename, md5, sha256, size):
+    try:
+        t = tarfile.open(filename)
+        index_json = t.extractfile('info/index.json').read().decode('utf-8')
+    except tarfile.TarError:
+        logger.debug("tarfile error encountered. Original error below.")
+        logger.debug(pformat(traceback.format_exc()))
+        logger.warning("Removing package: %s", filename)
+        _remove_package(filename)
+        return
+
+    def _get_output(cmd):
+        return subprocess.check_output(cmd).decode().strip().split()[0]
+
+    if size:
+        assert size == os.stat(filename).st_size
+        logger.debug('size check passed')
+    if md5:
+        assert md5 == _get_output(['md5sum', filename])
+        logger.debug('md5 check passed')
+    if sha256:
+        assert sha256 == _get_output(['sha2565sum', filename])
+        logger.debug('sha256 check passed')
+
+
+def _download(url, target_directory, package_metadata=None, validate=True,
+              chunk_size=None):
     if chunk_size is None:
         chunk_size = 1024  # 1KB chunks
     logger.info("download_url=%s", url)
-    with open(filename, 'wb') as f:
-        logger.info("Downloading to %s", filename)
+    # create a temporary file
+    target_filename = url.split('/')[-1]
+    download_filename = os.path.join(target_directory, target_filename)
+    logger.debug('downloading to %s', download_filename)
+    with open(download_filename, 'w+b') as tf:
         ret = requests.get(url, stream=True)
-        iterator = ret.iter_content(chunk_size)
-        for data in iterator:
-            f.write(data)
+        for data in ret.iter_content(chunk_size):
+            tf.write(data)
+    # do some validations
+    if validate and package_metadata:
+        _validate(download_filename,
+                  md5=package_metadata.get('md5'),
+                  sha256=package_metadata.get('sha256'),
+                  size=package_metadata.get('size'))
+    else:
+        logger.info("Not validating %s because validate is %s and "
+                     "package_metadata is %s", download_filename, validate,
+                     package_metadata)
+
+
+def _list_conda_packages(local_dir):
+    contents = os.listdir(local_dir)
+    return fnmatch.filter(contents, "*.tar.bz2")
+
+
+def _validate_packages(repodata, package_directory):
+    # validate local conda packages
+    local_packages = _list_conda_packages(package_directory)
+    for package in local_packages:
+        # ensure the packages in this directory are in the upstream
+        # repodata.json
+        try:
+            info = repodata[package]
+        except KeyError:
+            logger.warning("%s is not in the upstream index. Removing...",
+                            package)
+            _remove_package(os.path.join(package_directory, package))
+        else:
+            # validate the integrity of the package, the size of the package and
+            # its hashes
+            _validate(os.path.join(package_directory, package),
+                      md5=info.get('md5'), sha256=info.get('sha256'),
+                      size=info.get('size'))
 
 
 def main(upstream_channel, target_directory, platform, blacklist=None,
@@ -207,8 +293,6 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
         The values of blacklist should be (key, glob) where key is one of the
         keys in the repodata['packages'] dicts and glob is a thing to match
         on.  Note that all comparisons will be laundered through lowercasing.
-    verbose : bool
-        Increase chattiness of conda-mirror
 
     Notes
     -----
@@ -238,161 +322,109 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
      'size': 1960193,
      'version': '8.5.18'}
     """
+    # Steps:
+    # 1. validate local repo
+    # 2. figure out blacklisted packages
+    # 3. un-blacklist packages that are actually whitelisted
+    # 4. remove blacklisted packages
+    # 5. figure out final list of packages to mirror
+    # 6. mirror new packages to temp dir
+    # 7. validate new packages
+    # 8. download repodata.json and repodata.json.bz2
+
+    # Implementation:
+    if not os.path.exists(os.path.join(target_directory, platform)):
+        os.makedirs(os.path.join(target_directory, platform))
+    info, repodata = get_repodata(upstream_channel, platform)
+    local_directory = os.path.join(target_directory, platform)
+
+    # 1. validate local repo
+    _validate_packages(repodata=repodata,
+                       package_directory=local_directory)
+
+    # 2. figure out blacklisted packages
     blacklist_packages = {}
     whitelist_packages = {}
-    # get repodata from upstream channel
-    info, upstream_packages = get_repodata(upstream_channel, platform)
     # match blacklist conditions
     if blacklist:
         logger.debug("blacklist")
         blacklist_packages = {}
         for blist in blacklist:
-            matched_packages = match(upstream_packages, blist)
+            matched_packages = _match(repodata, blist)
             blacklist_packages.update(matched_packages)
-        logger.debug(pformat(list(blacklist_packages)))
+        logger.debug(pformat(sorted(blacklist_packages)))
+
+    # 3. un-blacklist packages that are actually whitelisted
     # match whitelist on blacklist
     if whitelist:
         logger.debug("whitelist")
         whitelist_packages = {}
         for wlist in whitelist:
-            matched_packages = match(upstream_packages, wlist)
+            matched_packages = _match(repodata, wlist)
             whitelist_packages.update(matched_packages)
-        logger.debug(pformat(list(whitelist_packages)))
+        logger.debug(pformat(sorted(whitelist_packages)))
     # make final mirror list of not-blacklist + whitelist
     true_blacklist = set(blacklist_packages.keys()) - set(
         whitelist_packages.keys())
     logger.debug('true blacklist')
-    logger.debug(pformat(whitelist_packages))
-    possible_packages_to_mirror = set(upstream_packages.keys()) - true_blacklist
+    logger.debug(pformat(sorted(whitelist_packages)))
+    possible_packages_to_mirror = set(repodata.keys()) - true_blacklist
     logger.debug('possible_packages_to_mirror')
-    logger.debug(pformat(possible_packages_to_mirror))
+    logger.debug(pformat(sorted(possible_packages_to_mirror)))
 
-    def list_dir(local_dir):
-        contents = os.listdir(local_dir)
-        return fnmatch.filter(contents, "*.tar.bz2")
-
-    local_directory = os.path.join(target_directory, platform)
-    # validate all packages in directory
-    run_conda_index(local_directory)
-    logger.debug('removing repodata.json from %s' % local_directory)
-    os.remove(os.path.join(local_directory, 'repodata.json'))
-    logger.debug('removing repodata.json from %s' % local_directory)
-    os.remove(os.path.join(local_directory, 'repodata.json.bz2'))
-
+    # 4. remove blacklisted packages
     # get list of current packages in folder
-    local_packages = list_dir(local_directory)
+    local_packages = _list_conda_packages(local_directory)
     # if any are not in the final mirror list, remove them
     for package_name in local_packages:
         if package_name in true_blacklist:
             _remove_package(os.path.join(local_directory, package_name))
+    # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
     # mirror list
-    local_packages = list_dir(local_directory)
+    local_packages = _list_conda_packages(local_directory)
     to_mirror = possible_packages_to_mirror - set(local_packages)
     logger.info('to_mirror')
-    logger.info(pformat(to_mirror))
+    logger.info(pformat(sorted(to_mirror)))
+
+    # 6. for each download:
+    # a. download to temp file
+    # b. validate contents of temp file
+    # c. move to local repo
     # mirror all new packages
-    for package_name in sorted(to_mirror):
-        url = DOWNLOAD_URL.format(
-            channel=upstream_channel,
-            name=upstream_packages[package_name]['name'],
-            version=upstream_packages[package_name]['version'],
-            platform=platform,
-            file_name=package_name)
-        download(url, os.path.join(local_directory, package_name))
+    with tempfile.TemporaryDirectory() as download_dir:
+        logger.info('downloading to the tempdir %s', download_dir)
+        for package_name in sorted(to_mirror):
+            url = DOWNLOAD_URL.format(
+                channel=upstream_channel,
+                name=repodata[package_name]['name'],
+                version=repodata[package_name]['version'],
+                platform=platform,
+                file_name=package_name)
+            _download(url, download_dir, repodata)
 
-    download(filename=os.path.join(local_directory, 'repodata.json'),
-             url=REPODATA.format(channel=upstream_channel,
-                                 platform=platform))
-    download(filename=os.path.join(local_directory, 'repodata.json.bz2'),
-             url=REPODATA.format(channel=upstream_channel,
-                                 platform=platform)+".bz2")
+        # 8. download repodata.json and repodata.json.bz2
+        url = REPODATA.format(channel=upstream_channel, platform=platform)
+        _download(url, download_dir, validate=False)
+        url = REPODATA.format(channel=upstream_channel, platform=platform) + ".bz2"
+        _download(url, download_dir, validate=False)
 
-
-def run_conda_index(target_directory):
-    """
-    Call out to conda_build.index:update_index
-
-    Parameters
-    ----------
-    target_directory : str
-        The full path to the platform subdirectory inside of the local conda
-        channel. The directory at this path should contain a "repodata.json" file
-        e.g., /path/to/local/repo/linux-64
-    """
-    logger.info("Indexing {}".format(target_directory))
-    config = Config()
-    config.timeout = 1
-    try:
-        update_index(target_directory, config, could_be_mirror=False)
-    except RuntimeError as re:
-        # ['Could', 'not', 'extract', 'upstream-mirror/linux-64/numpy-1.7.1-py27_p0.tar.bz2.', 'File', 'probably', 'corrupt.']
-        err_msg = str(re).split()
-        # find the one that looks like a filename
-        fname, = fnmatch.filter(err_msg, "*.tar.bz2*")
-        # and drop the trailing '.'
-        if fname.endswith('.'):
-            fname = fname[:-1]
-        logger.info("Caught an exception while trying to index: {}".format(re))
-        logger.info("Removing: {}".format(fname))
-        _remove_package(fname)
-        run_conda_index(target_directory)
-    except tarfile.ReadError as re:
-        # Find the new packages that don't exist in the repodata
-        bad_package, = _find_bad_package(target_directory)
-        _remove_package(bad_package)
-        run_conda_index(target_directory)
-
-
-def _find_bad_package(local_platform_directory):
-    """
-    Find the exact package that is causing a `tarfile.ReadError`
-
-    Parameters
-    ----------
-    local_platform_directory : str
-        Path to one of the platform subdirectories of a local conda channel
-        e.g., this is the folder that should contain all of the conda packages
-        and a "repodata.json"
-
-    Yields
-    ------
-    full_pkg_path : str
-        The full path to a package that results in `conda_build.index:read_index_tar()`
-        raising a tarfile.ReadError
-    """
-    repodata_fname = os.path.join(local_platform_directory, 'repodata.json')
-    repodata = {'info': {}, 'packages': {}}
-    if os.path.exists(repodata_fname):
-        with open(repodata_fname, 'r') as f:
-            repodata = json.load(f)
-    repodata_info, repodata_packages = repodata.get('info', {}), repodata.get('packages', {})
-    indexed_packages = list(repodata_packages.keys())
-    all_packages = fnmatch.filter(os.listdir(local_platform_directory), "*.tar.bz2")
-    potentially_bad = set(all_packages).difference(indexed_packages)
-    for pkg in potentially_bad:
-        full_pkg_path = os.path.join(local_platform_directory, pkg)
-        try:
-            read_index_tar(full_pkg_path, Config())
-        except tarfile.ReadError as re:
-            msg = "tarfile.ReadError encountered. Original error: {}".format(re)
-            msg += "\nRemoving bad package: {}".format(full_pkg_path)
-            logger.error(msg)
-            yield full_pkg_path
-
-
-def _remove_package(pkg_path):
-    """
-    Log and remove a package.
-
-    Parameters
-    ----------
-    pkg_path : str
-        Path to a conda package that should be removed
-    """
-    logger.info("Removing: {}".format(pkg_path))
-    os.remove(pkg_path)
-
+        # validate all packages in the download directory
+        _validate_packages(repodata, download_dir)
+        logger.debug('contents of %s are %s',
+                      download_dir,
+                      pformat(os.listdir(download_dir)))
+        # move new conda packages
+        for f in _list_conda_packages(download_dir):
+            old_path = os.path.join(download_dir, f)
+            new_path = os.path.join(local_directory, f)
+            logger.info("moving %s to %s", old_path, new_path)
+            shutil.move(old_path, new_path)
+        # move repodata.json and repodata.json.bz2
+        shutil.move(os.path.join(download_dir, 'repodata.json'),
+                    os.path.join(local_directory, 'repodata.json'))
+        shutil.move(os.path.join(download_dir, 'repodata.json.bz2'),
+                    os.path.join(local_directory, 'repodata.json.bz2'))
 
 if __name__ == "__main__":
     cli()

@@ -1,36 +1,39 @@
-import pytest
-import itertools
-import copy
-import sys
-from conda_mirror import conda_mirror
-from collections import namedtuple
-import os
-import json
 import bz2
+import copy
+import itertools
+import json
+import os
+import sys
+
+import pytest
+
+from conda_mirror import conda_mirror
+
 
 @pytest.fixture(scope='module')
 def repodata():
-    rd = namedtuple('repodata', ['anaconda', 'condaforge'])
-    anaconda = conda_mirror.get_repodata('anaconda', 'linux-64')
-    cf = conda_mirror.get_repodata('conda-forge', 'linux-64')
-    return rd(anaconda, cf)
+    repodata = {}
+    for channel in ['anaconda', 'conda-forge']:
+        repodata[channel] = conda_mirror.get_repodata(channel, 'linux-64')
+    return repodata
 
 
 def test_match(repodata):
-    repodata_info, repodata_packages = repodata.anaconda
-    matched = conda_mirror.match(repodata_packages, {'name': 'jupyter'})
+    repodata_info, repodata_packages = repodata['anaconda']
+    matched = conda_mirror._match(repodata_packages, {'name': 'jupyter'})
     assert set([v['name'] for v in matched.values()]) == set(['jupyter'])
 
-    matched = conda_mirror.match(repodata_packages, {'name': "*"})
+    matched = conda_mirror._match(repodata_packages, {'name': "*"})
     assert len(matched) == len(repodata_packages)
 
 @pytest.mark.parametrize(
     'channel,platform',
     itertools.product(['anaconda', 'conda-forge'], ['linux-64']))
-def test_cli(tmpdir, channel, platform):
-    info, packages = conda_mirror.get_repodata(channel, platform)
+def test_cli(tmpdir, channel, platform, repodata):
+    info, packages = repodata[channel]
     smallest_package = sorted(packages, key=lambda x: packages[x]['size'])[0]
-    f2 = tmpdir.mkdir('%s' % channel)
+    f2 = tmpdir.mkdir(channel)
+    f2.mkdir(platform)
     f1 = tmpdir.mkdir('conf').join('conf.yaml')
 
     f1.write('''
@@ -47,6 +50,7 @@ whitelist:
                 " --target-directory {target_directory}"
                 " --platform {platform}"
                 " --pdb"
+                " --verbose"
                 ).format(config=f1.strpath,
                          channel=channel,
                          target_directory=f2.strpath,
@@ -70,19 +74,26 @@ whitelist:
     assert len(disk_packages) == len(packages)
 
 
-def test_handling_bad_package(tmpdir):
+def test_handling_bad_package(tmpdir, repodata):
     # ensure that bad conda packages are actually removed by run_conda_index
     local_repo_root = tmpdir.mkdir('repo').strpath
     bad_pkg_root = os.path.join(local_repo_root, 'linux-64')
     os.makedirs(bad_pkg_root)
     bad_pkg_name = 'bad-1-0.tar.bz2'
-    bad_pkg_path = os.path.join(bad_pkg_root, bad_pkg_name)
 
-    if os.path.exists(bad_pkg_path):
-        os.remove(bad_pkg_path)
-
-    with bz2.BZ2File(bad_pkg_path, 'wb') as f:
+    # Test removal functionality of packages that are not in the upstream
+    # repodata.json
+    with bz2.BZ2File(os.path.join(bad_pkg_root, bad_pkg_name), 'wb') as f:
         f.write("This is a fake package".encode())
     assert bad_pkg_name in os.listdir(bad_pkg_root)
-    conda_mirror.run_conda_index(bad_pkg_root)
+    conda_mirror._validate_packages(repodata, bad_pkg_root)
+    assert bad_pkg_name not in os.listdir(bad_pkg_root)
+
+    # Test removal of broken packages that do exist in upstream repodata.json
+    anaconda_repodata = repodata['anaconda'][1]
+    bad_pkg_name = next(iter(anaconda_repodata.keys()))
+    with bz2.BZ2File(os.path.join(bad_pkg_root, bad_pkg_name), 'wb') as f:
+        f.write("This is a fake package".encode())
+    assert bad_pkg_name in os.listdir(bad_pkg_root)
+    conda_mirror._validate_packages(repodata, bad_pkg_root)
     assert bad_pkg_name not in os.listdir(bad_pkg_root)
