@@ -143,9 +143,14 @@ def cli():
     global logger
     logger = logging.getLogger('conda_mirror')
     logger.setLevel(loglevel)
+    format_string = '%(levelname)s: %(message)s'
+    formatter = logging.Formatter(fmt=format_string)
     stream_handler = logging.StreamHandler()
     stream_handler.setLevel(loglevel)
+    stream_handler.setFormatter(fmt=formatter)
+
     logger.addHandler(stream_handler)
+
 
     print(sys.argv)
     parser = _make_arg_parser()
@@ -193,9 +198,9 @@ def _validate(filename, md5, sha256, size):
         t = tarfile.open(filename)
         index_json = t.extractfile('info/index.json').read().decode('utf-8')
     except tarfile.TarError:
-        logging.debug("tarfile error encountered. Original error below.")
-        logging.debug(pformat(traceback.format_exc()))
-        logging.info("Removing package: %s", filename)
+        logger.debug("tarfile error encountered. Original error below.")
+        logger.debug(pformat(traceback.format_exc()))
+        logger.warning("Removing package: %s", filename)
         _remove_package(filename)
         return
 
@@ -221,7 +226,7 @@ def _download(url, target_directory, package_metadata=None, validate=True,
     # create a temporary file
     target_filename = url.split('/')[-1]
     download_filename = os.path.join(target_directory, target_filename)
-    logging.debug('downloading to %s', download_filename)
+    logger.debug('downloading to %s', download_filename)
     with open(download_filename, 'w+b') as tf:
         ret = requests.get(url, stream=True)
         for data in ret.iter_content(chunk_size):
@@ -233,7 +238,7 @@ def _download(url, target_directory, package_metadata=None, validate=True,
                   sha256=package_metadata.get('sha256'),
                   size=package_metadata.get('size'))
     else:
-        logging.info("Not validating %s because validate is %s and "
+        logger.info("Not validating %s because validate is %s and "
                      "package_metadata is %s", download_filename, validate,
                      package_metadata)
 
@@ -252,8 +257,8 @@ def _validate_packages(repodata, package_directory):
         try:
             info = repodata[package]
         except KeyError:
-            logging.info("%s is not in the upstream index. Removing..."
-                         "", package)
+            logger.warning("%s is not in the upstream index. Removing...",
+                            package)
             _remove_package(os.path.join(package_directory, package))
         else:
             # validate the integrity of the package, the size of the package and
@@ -388,7 +393,7 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
     # c. move to local repo
     # mirror all new packages
     with tempfile.TemporaryDirectory() as download_dir:
-        logging.info('downloading to the tempdir %s', download_dir)
+        logger.info('downloading to the tempdir %s', download_dir)
         for package_name in sorted(to_mirror):
             url = DOWNLOAD_URL.format(
                 channel=upstream_channel,
@@ -406,16 +411,20 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
 
         # validate all packages in the download directory
         _validate_packages(repodata, download_dir)
-        logging.debug('contents of %s are %s',
+        logger.debug('contents of %s are %s',
                       download_dir,
                       pformat(os.listdir(download_dir)))
-        for f in os.listdir(download_dir):
-
-            if f.endswith('json') or f.endswith('.bz2'):
-                old_path = os.path.join(download_dir, f)
-                new_path = os.path.join(local_directory, f)
-                logging.info("moving %s to %s", old_path, new_path)
-                shutil.move(old_path, new_path)
+        # move new conda packages
+        for f in _list_conda_packages(download_dir):
+            old_path = os.path.join(download_dir, f)
+            new_path = os.path.join(local_directory, f)
+            logger.info("moving %s to %s", old_path, new_path)
+            shutil.move(old_path, new_path)
+        # move repodata.json and repodata.json.bz2
+        shutil.move(os.path.join(download_dir, 'repodata.json'),
+                    os.path.join(local_directory, 'repodata.json'))
+        shutil.move(os.path.join(download_dir, 'repodata.json.bz2'),
+                    os.path.join(local_directory, 'repodata.json.bz2'))
 
 if __name__ == "__main__":
     cli()
