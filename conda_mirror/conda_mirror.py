@@ -219,26 +219,23 @@ def _download(url, target_directory, package_metadata=None, validate=True,
         chunk_size = 1024  # 1KB chunks
     logger.info("download_url=%s", url)
     # create a temporary file
-    handle, download_filename = tempfile.mkstemp()
+    target_filename = url.split('/')[-1]
+    download_filename = os.path.join(target_directory, target_filename)
+    logging.debug('downloading to %s', download_filename)
     with open(download_filename, 'w+b') as tf:
         ret = requests.get(url, stream=True)
         for data in ret.iter_content(chunk_size):
             tf.write(data)
-    target_filename = url.split('/')[-1]
-    shutil.move(download_filename, target_filename)
     # do some validations
     if validate and package_metadata:
-        _validate(target_filename,
+        _validate(download_filename,
                   md5=package_metadata.get('md5'),
                   sha256=package_metadata.get('sha256'),
                   size=package_metadata.get('size'))
     else:
         logging.info("Not validating %s because validate is %s and "
-                     "package_metadata is %s", target_filename, validate,
+                     "package_metadata is %s", download_filename, validate,
                      package_metadata)
-
-    shutil.move(target_filename,
-                os.path.join(target_directory, target_filename))
 
 
 def _list_conda_packages(local_dir):
@@ -390,21 +387,35 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
     # b. validate contents of temp file
     # c. move to local repo
     # mirror all new packages
-    for package_name in sorted(to_mirror):
-        url = DOWNLOAD_URL.format(
-            channel=upstream_channel,
-            name=repodata[package_name]['name'],
-            version=repodata[package_name]['version'],
-            platform=platform,
-            file_name=package_name)
-        _download(url, local_directory, repodata)
+    with tempfile.TemporaryDirectory() as download_dir:
+        logging.info('downloading to the tempdir %s', download_dir)
+        for package_name in sorted(to_mirror):
+            url = DOWNLOAD_URL.format(
+                channel=upstream_channel,
+                name=repodata[package_name]['name'],
+                version=repodata[package_name]['version'],
+                platform=platform,
+                file_name=package_name)
+            _download(url, download_dir, repodata)
 
-    # 8. download repodata.json and repodata.json.bz2
-    url = REPODATA.format(channel=upstream_channel, platform=platform)
-    _download(url, local_directory, validate=False)
-    url = REPODATA.format(channel=upstream_channel, platform=platform) + ".bz2"
-    _download(url, local_directory, validate=False)
+        # 8. download repodata.json and repodata.json.bz2
+        url = REPODATA.format(channel=upstream_channel, platform=platform)
+        _download(url, download_dir, validate=False)
+        url = REPODATA.format(channel=upstream_channel, platform=platform) + ".bz2"
+        _download(url, download_dir, validate=False)
 
+        # validate all packages in the download directory
+        _validate_packages(repodata, download_dir)
+        logging.debug('contents of %s are %s',
+                      download_dir,
+                      pformat(os.listdir(download_dir)))
+        for f in os.listdir(download_dir):
+
+            if f.endswith('json') or f.endswith('.bz2'):
+                old_path = os.path.join(download_dir, f)
+                new_path = os.path.join(local_directory, f)
+                logging.info("moving %s to %s", old_path, new_path)
+                shutil.move(old_path, new_path)
 
 if __name__ == "__main__":
     cli()

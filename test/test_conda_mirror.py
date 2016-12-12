@@ -50,6 +50,7 @@ whitelist:
                 " --target-directory {target_directory}"
                 " --platform {platform}"
                 " --pdb"
+                " --verbose"
                 ).format(config=f1.strpath,
                          channel=channel,
                          target_directory=f2.strpath,
