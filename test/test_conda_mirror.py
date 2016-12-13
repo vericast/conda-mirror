@@ -83,6 +83,7 @@ def test_handling_bad_package(tmpdir, repodata):
 
     # Test removal functionality of packages that are not in the upstream
     # repodata.json
+    conda_mirror.logger.info("Testing %s", bad_pkg_name)
     with bz2.BZ2File(os.path.join(bad_pkg_root, bad_pkg_name), 'wb') as f:
         f.write("This is a fake package".encode())
     assert bad_pkg_name in os.listdir(bad_pkg_root)
@@ -92,8 +93,9 @@ def test_handling_bad_package(tmpdir, repodata):
     # Test removal of broken packages that do exist in upstream repodata.json
     anaconda_repodata = repodata['anaconda'][1]
     bad_pkg_name = next(iter(anaconda_repodata.keys()))
+    conda_mirror.logger.info("Testing %s", bad_pkg_name)
     with bz2.BZ2File(os.path.join(bad_pkg_root, bad_pkg_name), 'wb') as f:
         f.write("This is a fake package".encode())
     assert bad_pkg_name in os.listdir(bad_pkg_root)
-    conda_mirror._validate_packages(repodata, bad_pkg_root)
+    conda_mirror._validate_packages(anaconda_repodata, bad_pkg_root)
     assert bad_pkg_name not in os.listdir(bad_pkg_root)

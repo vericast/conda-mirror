@@ -142,6 +142,8 @@ def cli():
     loglevel = logging.INFO
     global logger
     logger = logging.getLogger('conda_mirror')
+    for handler in logger.handlers:
+        logger.removeHandler(handler)
     logger.setLevel(loglevel)
     format_string = '%(levelname)s: %(message)s'
     formatter = logging.Formatter(fmt=format_string)
