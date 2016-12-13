@@ -1,5 +1,11 @@
 # changes in conda-mirror
 
+## 0.4.2
+- Remove packages that fail their validation checks
+
+## 0.4.1
+- Removed conda-build as a dependency in setup.py
+
 ## 0.4.0
 - Removed use of conda_index to find bad packages
 - New workflow:
