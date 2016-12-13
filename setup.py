@@ -15,7 +15,6 @@ setup(
     install_requires=[
         'requests',
         'pyyaml',
-        'conda-build',
     ],
     entry_points={
         "console_scripts": [
