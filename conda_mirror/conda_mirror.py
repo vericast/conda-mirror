@@ -206,16 +206,21 @@ def _validate(filename, md5, sha256, size):
 
     def _get_output(cmd):
         return subprocess.check_output(cmd).decode().strip().split()[0]
-
-    if size:
-        assert size == os.stat(filename).st_size
-        logger.debug('size check passed')
-    if md5:
-        assert md5 == _get_output(['md5sum', filename])
-        logger.debug('md5 check passed')
-    if sha256:
-        assert sha256 == _get_output(['sha2565sum', filename])
-        logger.debug('sha256 check passed')
+    try:
+        if size:
+            assert size == os.stat(filename).st_size
+            logger.debug('size check passed')
+        if md5:
+            assert md5 == _get_output(['md5sum', filename])
+            logger.debug('md5 check passed')
+        if sha256:
+            assert sha256 == _get_output(['sha2565sum', filename])
+            logger.debug('sha256 check passed')
+    except AssertionError:
+        logger.error("Package validation failed")
+        logger.error(pformat(traceback.format_exc()))
+        logger.error("Removing package %s", filename)
+        _remove_package(filename)
 
 
 def _download(url, target_directory, package_metadata=None, validate=True,
