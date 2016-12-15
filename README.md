@@ -1,6 +1,6 @@
 # conda-mirror
-[![Build Status](https://travis-ci.org/ericdill/conda-mirror.svg?branch=master)](https://travis-ci.org/ericdill/conda-mirror)
-[![codecov](https://codecov.io/gh/ericdill/conda-mirror/branch/master/graph/badge.svg)](https://codecov.io/gh/ericdill/conda-mirror)
+[![Build Status](https://travis-ci.org/maxpoint/conda-mirror.svg?branch=master)](https://travis-ci.org/maxpoint/conda-mirror)
+[![codecov](https://codecov.io/gh/maxpoint/conda-mirror/branch/master/graph/badge.svg)](https://codecov.io/gh/maxpoint/conda-mirror)
 
 
 ## Example Usage
