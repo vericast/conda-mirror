@@ -195,7 +195,7 @@ def _remove_package(pkg_path):
     os.remove(pkg_path)
 
 
-def _validate(filename, md5, sha256, size):
+def _validate(filename, md5=None, sha256=None, size=None):
     try:
         t = tarfile.open(filename)
         index_json = t.extractfile('info/index.json').read().decode('utf-8')
@@ -222,15 +222,19 @@ def _validate(filename, md5, sha256, size):
             logger.error(pformat(traceback.format_exc()))
             logger.error("Removing package %s", filename)
             _remove_package(filename)
+            return True
         else:
             logger.debug('%s check passed', assertion_test)
 
-    if size:
-        _assert_or_remove(size, os.stat(filename).st_size, 'size')
-    if md5:
-        _assert_or_remove(md5, _get_output(['md5sum', filename]), 'md5')
-    if sha256:
-        _assert_or_remove(sha256, _get_output(['sha2565sum', filename]), 'sha256')
+    checks = [
+        (size, lambda: os.stat(filename).st_size, 'size'),
+        (md5, lambda: _get_output(['md5sum', filename]), 'md5'),
+        (sha256, lambda: _get_output(['sha256sum', filename]), 'sha256'),
+    ]
+    for target, function, description in checks:
+        if target is not None:
+            if _assert_or_remove(target, function(), description):
+                return
 
 
 def _download(url, target_directory, package_metadata=None, validate=True,
@@ -339,14 +343,15 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
      'version': '8.5.18'}
     """
     # Steps:
-    # 1. validate local repo
-    # 2. figure out blacklisted packages
-    # 3. un-blacklist packages that are actually whitelisted
-    # 4. remove blacklisted packages
-    # 5. figure out final list of packages to mirror
-    # 6. mirror new packages to temp dir
-    # 7. validate new packages
+    # 1. figure out blacklisted packages
+    # 2. un-blacklist packages that are actually whitelisted
+    # 3. remove blacklisted packages
+    # 4. figure out final list of packages to mirror
+    # 5. mirror new packages to temp dir
+    # 6. validate new packages
+    # 7. copy new packages to repo directory
     # 8. download repodata.json and repodata.json.bz2
+    # 9. copy new repodata.json and repodata.json.bz2 into the repo
 
     # Implementation:
     if not os.path.exists(os.path.join(target_directory, platform)):
