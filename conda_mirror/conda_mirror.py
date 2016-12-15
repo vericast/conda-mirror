@@ -8,6 +8,7 @@ import pdb
 import shutil
 import subprocess
 import sys
+import json
 import tarfile
 import tempfile
 import traceback
@@ -425,17 +426,31 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
                 file_name=package_name)
             _download(url, download_dir, repodata)
 
-        # 8. download repodata.json and repodata.json.bz2
-        url = REPODATA.format(channel=upstream_channel, platform=platform)
-        _download(url, download_dir, validate=False)
-        url = REPODATA.format(channel=upstream_channel, platform=platform) + ".bz2"
-        _download(url, download_dir, validate=False)
-
         # validate all packages in the download directory
         _validate_packages(repodata, download_dir)
         logger.debug('contents of %s are %s',
                       download_dir,
                       pformat(os.listdir(download_dir)))
+
+        # 8. download repodata.json and repodata.json.bz2
+        url = REPODATA.format(channel=upstream_channel, platform=platform)
+        _download(url, download_dir, validate=False)
+
+        # prune the repodata.json file of packages we don't want
+        repodata_path = os.path.join(download_dir, 'repodata.json')
+        # load the json into a python dictionary
+        with open(repodata_path, 'r') as f:
+            rd = json.load(f)
+        # compute the packages that we have locally
+        packages_we_have = set(local_packages +
+                               _list_conda_packages(download_dir))
+        # remake the packages dictionary with only the packages we have locally
+        rd['packages'] = {name: info for name, info in rd['packages'].items()
+                          if name in packages_we_have}
+        # and dump it back out to disk
+        with open(repodata_path, 'w') as f:
+            json.dump(rd, f)
+
         # move new conda packages
         for f in _list_conda_packages(download_dir):
             old_path = os.path.join(download_dir, f)
@@ -445,8 +460,12 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
         # move repodata.json and repodata.json.bz2
         shutil.move(os.path.join(download_dir, 'repodata.json'),
                     os.path.join(local_directory, 'repodata.json'))
-        shutil.move(os.path.join(download_dir, 'repodata.json.bz2'),
-                    os.path.join(local_directory, 'repodata.json.bz2'))
+        zipped_repodata_file = os.path.join(local_directory,
+                                            'repodata.json.bz2')
+        # remove the zipped repodata file. We don't care about it, unless
+        # conda changes its minds
+        if os.path.exists(zipped_repodata_file):
+            os.remove(zipped_repodata_file)
 
 if __name__ == "__main__":
     cli()
