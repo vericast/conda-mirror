@@ -207,7 +207,12 @@ def _validate(filename, md5, sha256, size):
         return
 
     def _get_output(cmd):
-        return subprocess.check_output(cmd).decode().strip().split()[0]
+        try:
+            return subprocess.check_output(cmd).decode().strip().split()[0]
+        except subprocess.CalledProcessError as cpe:
+            logger.error(cpe.output.decode())
+            return ""
+
     def _assert_or_remove(left, right, assertion_test):
         try:
             assert left == right
