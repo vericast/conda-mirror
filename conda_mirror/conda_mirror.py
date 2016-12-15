@@ -278,6 +278,7 @@ def _validate_packages(repodata, package_directory):
         else:
             # validate the integrity of the package, the size of the package and
             # its hashes
+            logger.info('Validating %s', package)
             _validate(os.path.join(package_directory, package),
                       md5=info.get('md5'), sha256=info.get('sha256'),
                       size=info.get('size'))
@@ -354,8 +355,9 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
     local_directory = os.path.join(target_directory, platform)
 
     # 1. validate local repo
-    _validate_packages(repodata=repodata,
-                       package_directory=local_directory)
+    # validating all packages is taking many hours.
+    # _validate_packages(repodata=repodata,
+    #                    package_directory=local_directory)
 
     # 2. figure out blacklisted packages
     blacklist_packages = {}
