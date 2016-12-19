@@ -14,7 +14,7 @@ import tempfile
 import traceback
 from glob import fnmatch
 from pprint import pformat
-
+import bz2
 import requests
 import yaml
 
@@ -438,34 +438,37 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
 
         # prune the repodata.json file of packages we don't want
         repodata_path = os.path.join(download_dir, 'repodata.json')
+
         # load the json into a python dictionary
         with open(repodata_path, 'r') as f:
             rd = json.load(f)
         # compute the packages that we have locally
         packages_we_have = set(local_packages +
                                _list_conda_packages(download_dir))
-        # remake the packages dictionary with only the packages we have locally
-        rd['packages'] = {name: info for name, info in rd['packages'].items()
+        # remake the packages dictionary with only the packages we have
+        # locally
+        rd['packages'] = {name: info for name, info in
+                          rd['packages'].items()
                           if name in packages_we_have}
-        # and dump it back out to disk
-        with open(repodata_path, 'w') as f:
-            json.dump(rd, f)
-
         # move new conda packages
         for f in _list_conda_packages(download_dir):
             old_path = os.path.join(download_dir, f)
             new_path = os.path.join(local_directory, f)
             logger.info("moving %s to %s", old_path, new_path)
             shutil.move(old_path, new_path)
-        # move repodata.json and repodata.json.bz2
-        shutil.move(os.path.join(download_dir, 'repodata.json'),
-                    os.path.join(local_directory, 'repodata.json'))
-        zipped_repodata_file = os.path.join(local_directory,
-                                            'repodata.json.bz2')
-        # remove the zipped repodata file. We don't care about it, unless
-        # conda changes its minds
-        if os.path.exists(zipped_repodata_file):
-            os.remove(zipped_repodata_file)
+
+        data = json.dumps(rd, indent=2, sort_keys=True)
+        # strip trailing whitespace
+        data = '\n'.join(line.rstrip() for line in data.splitlines())
+        # make sure we have newline at the end
+        if not data.endswith('\n'):
+            data += '\n'
+        with open(os.path.join(local_directory,
+                               'repodata.json'), 'w') as fo:
+            fo.write(data)
+        with open(os.path.join(local_directory,
+                               'repodata.json.bz2'), 'wb') as fo:
+            fo.write(bz2.compress(data.encode('utf-8')))
 
 if __name__ == "__main__":
     cli()

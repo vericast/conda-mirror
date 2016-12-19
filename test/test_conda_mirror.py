@@ -64,14 +64,21 @@ whitelist:
         # make sure the repodata file exists
         assert f in os.listdir(os.path.join(f2.strpath, platform))
 
-    # make sure the repodata contents are identical from what we fetched from
-    # upstream and what we wrote to disk
+    # make sure that the repodata contains less than upstream since we prune it
     with open(os.path.join(f2.strpath, platform, 'repodata.json'), 'r') as f:
         disk_repodata = json.load(f)
     disk_info = disk_repodata.get('info', {})
     assert len(disk_info) == len(info)
     disk_packages = disk_repodata.get('packages', {})
-    assert len(disk_packages) == len(packages)
+    assert len(disk_packages) < len(packages)
+    with bz2.BZ2File(os.path.join(f2.strpath,
+                                  platform,
+                                  'repodata.json.bz2'), 'r') as f:
+        contents = f.read().decode()
+        rd = json.loads(contents)
+        assert len(rd['info']) == len(disk_info)
+        assert len(rd['packages']) == len(disk_packages)
+
 
 
 def test_handling_bad_package(tmpdir, repodata):
