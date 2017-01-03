@@ -463,12 +463,20 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
         # make sure we have newline at the end
         if not data.endswith('\n'):
             data += '\n'
-        with open(os.path.join(local_directory,
+
+        with open(os.path.join(download_dir,
                                'repodata.json'), 'w') as fo:
             fo.write(data)
-        with open(os.path.join(local_directory,
+        with open(os.path.join(download_dir,
                                'repodata.json.bz2'), 'wb') as fo:
             fo.write(bz2.compress(data.encode('utf-8')))
+        
+        for f in ('repodata.json', 'repodata.json.bz2'):
+            download_path = os.path.join(download_dir, f)
+            move_path = os.path.join(local_directory, f)
+            shutil.move(download_path, move_path)
+
+
 
 if __name__ == "__main__":
     cli()
