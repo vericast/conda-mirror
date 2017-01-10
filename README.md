@@ -60,15 +60,15 @@ Here are the contents of one of the entries in repodata['packages']
   'version': '1.4.10'}}
 ```
 
-See implementation details in the conda_mirror:match function for more 
+See implementation details in the conda_mirror:match function for more
 information.
 
 #### Common usage patterns
 ##### Mirror **only** one specific package
-If you wanted to match exactly the botocore package listed above with your 
-config, then you could use the following configuration to first blacklist 
+If you wanted to match exactly the botocore package listed above with your
+config, then you could use the following configuration to first blacklist
 **all** packages and then include just the botocore packages:
- 
+
 ```yaml
 blacklist:
     - name: "*"
@@ -97,8 +97,9 @@ whitelist:
 $ conda-mirror -h
 ['/home/edill/miniconda/bin/conda-mirror', '-h']
 usage: conda-mirror [-h] --upstream-channel UPSTREAM_CHANNEL
-                    --target-directory TARGET_DIRECTORY --platform PLATFORM
-                    [-v] [--config CONFIG] [--pdb]
+                    --target-directory TARGET_DIRECTORY
+                    [--temp-directory TEMP_DIRECTORY] --platform PLATFORM [-v]
+                    [--config CONFIG] [--pdb]
 
 CLI interface for conda-mirror.py
 
@@ -108,15 +109,18 @@ optional arguments:
                         The anaconda channel to mirror
   --target-directory TARGET_DIRECTORY
                         The place where packages should be mirrored to
+  --temp-directory TEMP_DIRECTORY
+                        Temporary download location for the packages
   --platform PLATFORM   The OS platform(s) to mirror. one of: {'linux-64',
                         'linux-32','osx-64', 'win-32', 'win-64'}
   -v, --verbose         This basically turns on tqdm progress bars for
                         downloads
   --config CONFIG       Path to the yaml config file
   --pdb                 Enable PDB debugging on exception
-```
 
 ## Testing
+
+### Install test requirements
 
 Note: Will install packages from pip
 
@@ -126,7 +130,11 @@ Requirement already satisfied: pytest in /home/edill/miniconda/lib/python3.5/sit
 Requirement already satisfied: coverage in /home/edill/miniconda/lib/python3.5/site-packages (from -r test-requirements.txt (line 2))
 Requirement already satisfied: pytest-ordering in /home/edill/miniconda/lib/python3.5/site-packages (from -r test-requirements.txt (line 3))
 Requirement already satisfied: py>=1.4.29 in /home/edill/miniconda/lib/python3.5/site-packages (from pytest->-r test-requirements.txt (line 1))
+```
 
+### Run the tests, invoking with the `coverage` tool.
+
+```
 $ coverage run run_tests.py -x
 sys.argv=['run_tests.py', '-x']
 ================================================================================== test session starts ===================================================================================
@@ -142,12 +150,16 @@ test/test_conda_mirror.py::test_cli[conda-forge-linux-64] PASSED
 test/test_conda_mirror.py::test_handling_bad_package PASSED
 
 =============================================================================== 4 passed in 15.66 seconds ================================================================================
+```
 
+### Show the coverage statistics
+
+```
 $ coverage report -m
 Name                           Stmts   Miss  Cover   Missing
 ------------------------------------------------------------
 conda_mirror/__init__.py           3      0   100%
-conda_mirror/conda_mirror.py     169     15    91%   154, 160, 289-290, 333-342, 370-371, 401
+conda_mirror/conda_mirror.py     210     16    92%   176, 219-221, 226-232, 244, 369, 413-414, 492
 ------------------------------------------------------------
-TOTAL                            172     15    91%
+TOTAL                            213     16    92%
 ```
