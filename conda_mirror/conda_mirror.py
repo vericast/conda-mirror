@@ -111,6 +111,12 @@ def _make_arg_parser():
         required=True
     )
     ap.add_argument(
+        '--temp-directory',
+        help='Temporary download location for the packages',
+        required=False,
+        default=tempfile.gettempdir()
+    )
+    ap.add_argument(
         '--platform',
         help=("The OS platform(s) to mirror. one of: {'linux-64', 'linux-32',"
               "'osx-64', 'win-32', 'win-64'}"),
@@ -179,8 +185,8 @@ def cli():
     blacklist = config_dict.get('blacklist')
     whitelist = config_dict.get('whitelist')
 
-    main(args.upstream_channel, args.target_directory, args.platform,
-         blacklist, whitelist)
+    main(args.upstream_channel, args.target_directory, args.temp_directory,
+         args.platform, blacklist, whitelist)
 
 
 def _remove_package(pkg_path):
@@ -289,8 +295,8 @@ def _validate_packages(repodata, package_directory):
                       size=info.get('size'))
 
 
-def main(upstream_channel, target_directory, platform, blacklist=None,
-         whitelist=None):
+def main(upstream_channel, target_directory, temp_directory, platform,
+         blacklist=None, whitelist=None):
     """
 
     Parameters
@@ -302,6 +308,10 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
         The path on disk to produce a local mirror of the upstream channel.
         Note that this is the directory that contains the platform
         subdirectories.
+    temp_directory : str
+        The path on disk to an existing and writable directory to temporarily
+        store the packages before moving them to the target_directory to
+        apply checks
     platform : str
         The platform that you want to mirror from
         anaconda.org/<upstream_channel>
@@ -415,7 +425,7 @@ def main(upstream_channel, target_directory, platform, blacklist=None,
     # b. validate contents of temp file
     # c. move to local repo
     # mirror all new packages
-    with tempfile.TemporaryDirectory() as download_dir:
+    with tempfile.TemporaryDirectory(dir=temp_directory) as download_dir:
         logger.info('downloading to the tempdir %s', download_dir)
         for package_name in sorted(to_mirror):
             url = DOWNLOAD_URL.format(
