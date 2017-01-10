@@ -163,3 +163,8 @@ conda_mirror/conda_mirror.py     210     16    92%   176, 219-221, 226-232, 244,
 ------------------------------------------------------------
 TOTAL                            213     16    92%
 ```
+
+## Other
+
+After a new contributor makes a pull-request that is approved, we will reach out
+and invite you to be a maintainer of the project.
