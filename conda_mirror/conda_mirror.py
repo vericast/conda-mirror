@@ -25,6 +25,9 @@ logger = None
 DEFAULT_BAD_LICENSES = ['agpl', '']
 
 DOWNLOAD_URL="https://anaconda.org/{channel}/{name}/{version}/download/{platform}/{file_name}"
+# The REPODATA template might break in the future if continuum decides to host
+# everything on anaconda/defaults at a different location than all the other
+# channels on anaconda.org
 REPODATA = 'https://conda.anaconda.org/{channel}/{platform}/repodata.json'
 DEFAULT_PLATFORMS = ['linux-64',
                      'linux-32',
@@ -363,7 +366,12 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # 7. copy new packages to repo directory
     # 8. download repodata.json and repodata.json.bz2
     # 9. copy new repodata.json and repodata.json.bz2 into the repo
-
+    if upstream_channel.lower() in ('anaconda', 'defaults'):
+        logger.warning("You are attempting to mirror the 'anaconda' or "
+                       "'defaults' channel. Continuum has special cased this "
+                       "channel to redirect to a different download url")
+        global DOWNLOAD_URL
+        DOWNLOAD_URL = "https://repo.continuum.io/pkgs/free/{platform}/{file_name}"
     # Implementation:
     if not os.path.exists(os.path.join(target_directory, platform)):
         os.makedirs(os.path.join(target_directory, platform))
