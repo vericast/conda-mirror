@@ -117,6 +117,7 @@ optional arguments:
                         downloads
   --config CONFIG       Path to the yaml config file
   --pdb                 Enable PDB debugging on exception
+```
 
 ## Testing
 
