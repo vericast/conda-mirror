@@ -9,17 +9,22 @@ import pytest
 
 from conda_mirror import conda_mirror
 
+anaconda_channel = 'https://repo.continuum.io/pkgs/free'
 
 @pytest.fixture(scope='module')
 def repodata():
     repodata = {}
-    for channel in ['anaconda', 'conda-forge']:
-        repodata[channel] = conda_mirror.get_repodata(channel, 'linux-64')
+    repodata['conda-forge'] = conda_mirror.get_repodata('conda-forge',
+                                                        'linux-64')
+    original_download_url = conda_mirror.DOWNLOAD_URL
+    conda_mirror.update_download_url(anaconda_channel)
+    repodata[anaconda_channel] = conda_mirror.get_repodata('free', 'linux-64')
+    conda_mirror.DOWNLOAD_URL = original_download_url
     return repodata
 
 
 def test_match(repodata):
-    repodata_info, repodata_packages = repodata['anaconda']
+    repodata_info, repodata_packages = repodata[anaconda_channel]
     matched = conda_mirror._match(repodata_packages, {'name': 'jupyter'})
     assert set([v['name'] for v in matched.values()]) == set(['jupyter'])
 
@@ -28,11 +33,13 @@ def test_match(repodata):
 
 @pytest.mark.parametrize(
     'channel,platform',
-    itertools.product(['https://repo.continuum.io/pkgs/free', 'conda-forge'], ['linux-64']))
+    itertools.product([anaconda_channel, 'conda-forge'], ['linux-64']))
 def test_cli(tmpdir, channel, platform, repodata):
     info, packages = repodata[channel]
     smallest_package = sorted(packages, key=lambda x: packages[x]['size'])[0]
-    f2 = tmpdir.mkdir(channel)
+    # drop the html stuff. get just the channel
+
+    f2 = tmpdir.mkdir(channel.rsplit('/', 1)[-1])
     f2.mkdir(platform)
     f1 = tmpdir.mkdir('conf').join('conf.yaml')
 
@@ -98,7 +105,7 @@ def test_handling_bad_package(tmpdir, repodata):
     assert bad_pkg_name not in os.listdir(bad_pkg_root)
 
     # Test removal of broken packages that do exist in upstream repodata.json
-    anaconda_repodata = repodata['anaconda'][1]
+    anaconda_repodata = repodata[anaconda_channel][1]
     bad_pkg_name = next(iter(anaconda_repodata.keys()))
     conda_mirror.logger.info("Testing %s", bad_pkg_name)
     with bz2.BZ2File(os.path.join(bad_pkg_root, bad_pkg_name), 'wb') as f:

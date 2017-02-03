@@ -208,7 +208,7 @@ def _remove_package(pkg_path):
 def _validate(filename, md5=None, sha256=None, size=None):
     try:
         t = tarfile.open(filename)
-        index_json = t.extractfile('info/index.json').read().decode('utf-8')
+        t.extractfile('info/index.json').read().decode('utf-8')
     except tarfile.TarError:
         logger.debug("tarfile error encountered. Original error below.")
         logger.debug(pformat(traceback.format_exc()))
@@ -298,6 +298,29 @@ def _validate_packages(repodata, package_directory):
                       size=info.get('size'))
 
 
+def update_download_url(channel):
+    """Update the download url if channel is a fully qualified channel
+
+    Parameters
+    ----------
+    channel : str
+        The channel to mirror. Can be an anaconda channel (e.g., conda-forge)
+        at which point this function is a no-op. If it is a fully qualified
+        channel, however, the global DOWNLOAD_URL will be updated to be a
+        template based on that fully qualified channel.
+        e.g., https://repo.continuum.io/pkgs/free
+        will become
+        https://repo.continuum.io/pkgs/{channel}/{platform}/{filename}
+        where channel == free
+    """
+    if channel.startswith('http'):
+        # then we need to assume it is a full url including the channel
+        download_url, channel = channel.rsplit('/', 1)
+        global DOWNLOAD_URL
+        DOWNLOAD_URL = download_url + "/{channel}/{platform}/{file_name}"
+    return channel
+
+
 def main(upstream_channel, target_directory, temp_directory, platform,
          blacklist=None, whitelist=None):
     """
@@ -366,13 +389,11 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # 7. copy new packages to repo directory
     # 8. download repodata.json and repodata.json.bz2
     # 9. copy new repodata.json and repodata.json.bz2 into the repo
-    if upstream_channel.startswith('http'):
-        # then we need to assume it is a full url including the channel
-        download_url, upstream_channel = upstream_channel.rsplit('/', 1)
-        global DOWNLOAD_URL
-        DOWNLOAD_URL = download_url + "/{channel}/{platform}/{file_name}"
 
-    # Implementation:
+    upstream_channel = update_download_url(upstream_channel)
+
+
+        # Implementation:
     if not os.path.exists(os.path.join(target_directory, platform)):
         os.makedirs(os.path.join(target_directory, platform))
     info, repodata = get_repodata(upstream_channel, platform)
@@ -490,12 +511,11 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         with open(os.path.join(download_dir,
                                'repodata.json.bz2'), 'wb') as fo:
             fo.write(bz2.compress(data.encode('utf-8')))
-        
+
         for f in ('repodata.json', 'repodata.json.bz2'):
             download_path = os.path.join(download_dir, f)
             move_path = os.path.join(local_directory, f)
             shutil.move(download_path, move_path)
-
 
 
 if __name__ == "__main__":
