@@ -28,7 +28,7 @@ def test_match(repodata):
 
 @pytest.mark.parametrize(
     'channel,platform',
-    itertools.product(['anaconda', 'conda-forge'], ['linux-64']))
+    itertools.product(['https://repo.continuum.io/pkgs/free', 'conda-forge'], ['linux-64']))
 def test_cli(tmpdir, channel, platform, repodata):
     info, packages = repodata[channel]
     smallest_package = sorted(packages, key=lambda x: packages[x]['size'])[0]

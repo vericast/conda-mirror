@@ -24,7 +24,7 @@ logger = None
 
 DEFAULT_BAD_LICENSES = ['agpl', '']
 
-DOWNLOAD_URL="https://anaconda.org/{channel}/{name}/{version}/download/{platform}/{file_name}"
+DOWNLOAD_URL="https://conda.anaconda.org/{channel}/{platform}/{file_name}"
 # The REPODATA template might break in the future if continuum decides to host
 # everything on anaconda/defaults at a different location than all the other
 # channels on anaconda.org
@@ -87,7 +87,7 @@ def get_repodata(channel, platform):
     packages : dict
         keyed on package name (e.g., twisted-16.0.0-py35_0.tar.bz2)
     """
-    url = REPODATA.format(channel=channel, platform=platform)
+    url = DOWNLOAD_URL.format(channel=channel, platform=platform, file_name='repodata.json')
     json = requests.get(url).json()
     return json.get('info', {}), json.get('packages', {})
 
@@ -366,12 +366,12 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # 7. copy new packages to repo directory
     # 8. download repodata.json and repodata.json.bz2
     # 9. copy new repodata.json and repodata.json.bz2 into the repo
-    if upstream_channel.lower() in ('anaconda', 'defaults'):
-        logger.warning("You are attempting to mirror the 'anaconda' or "
-                       "'defaults' channel. Continuum has special cased this "
-                       "channel to redirect to a different download url")
+    if upstream_channel.startswith('http'):
+        # then we need to assume it is a full url including the channel
+        download_url, upstream_channel = upstream_channel.rsplit('/', 1)
         global DOWNLOAD_URL
-        DOWNLOAD_URL = "https://repo.continuum.io/pkgs/free/{platform}/{file_name}"
+        DOWNLOAD_URL = download_url + "/{channel}/{platform}/{file_name}"
+
     # Implementation:
     if not os.path.exists(os.path.join(target_directory, platform)):
         os.makedirs(os.path.join(target_directory, platform))
@@ -450,7 +450,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                       download_dir,
                       pformat(os.listdir(download_dir)))
 
-        # 8. download repodata.json and repodata.json.bz2
+        # 8. download repodata.json
         url = REPODATA.format(channel=upstream_channel, platform=platform)
         _download(url, download_dir, validate=False)
 
@@ -485,6 +485,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         with open(os.path.join(download_dir,
                                'repodata.json'), 'w') as fo:
             fo.write(data)
+        # compress repodata.json into the bz2 format. some conda commands still
+        # need it
         with open(os.path.join(download_dir,
                                'repodata.json.bz2'), 'wb') as fo:
             fo.write(bz2.compress(data.encode('utf-8')))
