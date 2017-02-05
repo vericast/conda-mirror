@@ -118,12 +118,10 @@ def _make_arg_parser():
         help=('The target channel to mirror. Can be a channel on anaconda.org '
               'like "conda-forge" or a full qualified channel like '
               '"https://repo.continuum.io/pkgs/free/"'),
-        required=True
     )
     ap.add_argument(
         '--target-directory',
         help='The place where packages should be mirrored to',
-        required=True
     )
     ap.add_argument(
         '--temp-directory',
@@ -131,14 +129,12 @@ def _make_arg_parser():
               'randomly selected temporary directory. Note that you might need '
               'to specify a different location if your default temp directory '
               'has less available space than your mirroring target'),
-        required=False,
         default=tempfile.gettempdir()
     )
     ap.add_argument(
         '--platform',
         help=("The OS platform(s) to mirror. one of: {'linux-64', 'linux-32',"
               "'osx-64', 'win-32', 'win-64'}"),
-        required=True
     )
     ap.add_argument(
         '-v', '--verbose',
@@ -178,9 +174,18 @@ def cli():
 
     logger.addHandler(stream_handler)
 
-    logger.info(sys.argv)
+    logger.debug(sys.argv)
     parser = _make_arg_parser()
     args = parser.parse_args()
+    if args.version:
+        from . import __version__
+        print(__version__)
+        return
+
+    for required in ('target_directory', 'platform', 'upstream_channel'):
+        if not getattr(args, required):
+            logger.error("Missing required argument: %s", required)
+            return
 
     if args.verbose:
         logger.setLevel(logging.DEBUG)
