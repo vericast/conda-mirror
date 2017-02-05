@@ -18,22 +18,53 @@ import bz2
 import requests
 import yaml
 
-
 logger = None
-
 
 DEFAULT_BAD_LICENSES = ['agpl', '']
 
-DOWNLOAD_URL="https://conda.anaconda.org/{channel}/{platform}/{file_name}"
-# The REPODATA template might break in the future if continuum decides to host
-# everything on anaconda/defaults at a different location than all the other
-# channels on anaconda.org
-REPODATA = 'https://conda.anaconda.org/{channel}/{platform}/repodata.json'
 DEFAULT_PLATFORMS = ['linux-64',
                      'linux-32',
                      'osx-64',
                      'win-64',
                      'win-32']
+
+
+def _maybe_split_channel(channel):
+    """Split channel if it is fully qualified. Otherwise default to
+    conda.anaconda.org
+
+    Parameters
+    ----------
+    channel : str
+        channel on anaconda, like "conda-forge" or fully qualified channel like
+        "https://conda.anacocnda.org/conda-forge"
+
+    Returns
+    -------
+    download_template : str
+        defaults to "https://conda.anaconda.org/{channel}/{platform}/{file_name}"
+        The base url will be modified if the `channel` input parameter is
+        fully qualified
+    channel : str
+        The name-only channel. If the channel input param is something like
+        "conda-forge", then "conda-forge" will be returned. If the channel
+        input param is something like "https://repo.continuum.io/pkgs/free/"
+    """
+    # strip trailing slashes
+    channel = channel.strip('/')
+
+    default_url_base = "https://conda.anaconda.org/"
+    url_suffix = "/{channel}/{platform}/{file_name}"
+    if '://' not in channel:
+        # assume we are being given a channel for anaconda.org
+        logger.debug("Assuming %s is an anaconda.org channel", channel)
+        url = default_url_base + url_suffix
+        return url, channel
+    # looks like we are being given a fully qualified channel
+    download_base, channel = channel.rsplit('/', 1)
+    download_template = download_base + url_suffix
+    logger.debug('download_template=%s. channel=%s', download_template, channel)
+    return download_template, channel
 
 
 def _match(all_packages, key_glob_dict):
@@ -71,27 +102,6 @@ def _match(all_packages, key_glob_dict):
     return matched
 
 
-def get_repodata(channel, platform):
-    """Get the repodata.json file for a channel/platform combo on anaconda.org
-
-    Parameters
-    ----------
-    channel : str
-        anaconda.org/CHANNEL
-    platform : {'linux-64', 'linux-32', 'osx-64', 'win-32', 'win-64'}
-        The platform of interest
-
-    Returns
-    -------
-    info : dict
-    packages : dict
-        keyed on package name (e.g., twisted-16.0.0-py35_0.tar.bz2)
-    """
-    url = DOWNLOAD_URL.format(channel=channel, platform=platform, file_name='repodata.json')
-    json = requests.get(url).json()
-    return json.get('info', {}), json.get('packages', {})
-
-
 def _make_arg_parser():
     """
     Localize the ArgumentParser logic
@@ -105,7 +115,9 @@ def _make_arg_parser():
 
     ap.add_argument(
         '--upstream-channel',
-        help='The anaconda channel to mirror',
+        help=('The target channel to mirror. Can be a channel on anaconda.org '
+              'like "conda-forge" or a full qualified channel like '
+              '"https://repo.continuum.io/pkgs/free/"'),
         required=True
     )
     ap.add_argument(
@@ -115,7 +127,10 @@ def _make_arg_parser():
     )
     ap.add_argument(
         '--temp-directory',
-        help='Temporary download location for the packages',
+        help=('Temporary download location for the packages. Defaults to a '
+              'randomly selected temporary directory. Note that you might need '
+              'to specify a different location if your default temp directory '
+              'has less available space than your mirroring target'),
         required=False,
         default=tempfile.gettempdir()
     )
@@ -128,7 +143,7 @@ def _make_arg_parser():
     ap.add_argument(
         '-v', '--verbose',
         action="store_true",
-        help="This basically turns on tqdm progress bars for downloads",
+        help="Show even more output. As if I'm not already chatty enough!",
         default=False,
     )
     ap.add_argument(
@@ -163,15 +178,13 @@ def cli():
 
     logger.addHandler(stream_handler)
 
-
-    print(sys.argv)
+    logger.info(sys.argv)
     parser = _make_arg_parser()
     args = parser.parse_args()
 
     if args.verbose:
         logger.setLevel(logging.DEBUG)
         stream_handler.setLevel(logging.DEBUG)
-
 
     if args.pdb:
         # set the pdb_hook as the except hook for all exceptions
@@ -206,6 +219,24 @@ def _remove_package(pkg_path):
 
 
 def _validate(filename, md5=None, sha256=None, size=None):
+    """Validate the conda package tarfile located at `filename` with any of the
+    passed in options `md5`, `sha256` or `size. Also implicitly validate that
+    the conda package is a valid tarfile.
+
+    NOTE: Removes packages that fail validation
+
+    Parameters
+    ----------
+    filename : str
+        The path to the file you wish to validate
+    md5 : str, optional
+        If provided, perform an `md5sum` on `filename` and compare to `md5`
+    sha256 : str, optional
+        If provided, perform a `sha256sum` on `filename` and compare to `sha256`
+    size : int, optional
+        if provided, stat the file at `filename` and make sure its size
+        matches `size`
+    """
     try:
         t = tarfile.open(filename)
         t.extractfile('info/index.json').read().decode('utf-8')
@@ -241,14 +272,54 @@ def _validate(filename, md5=None, sha256=None, size=None):
         (md5, lambda: _get_output(['md5sum', filename]), 'md5'),
         (sha256, lambda: _get_output(['sha256sum', filename]), 'sha256'),
     ]
-    for target, function, description in checks:
+    for target, validate_function, description in checks:
         if target is not None:
-            if _assert_or_remove(target, function(), description):
+            if _assert_or_remove(target, validate_function(), description):
                 return
+
+
+def get_repodata(channel, platform):
+    """Get the repodata.json file for a channel/platform combo on anaconda.org
+
+    Parameters
+    ----------
+    channel : str
+        anaconda.org/CHANNEL
+    platform : {'linux-64', 'linux-32', 'osx-64', 'win-32', 'win-64'}
+        The platform of interest
+
+    Returns
+    -------
+    info : dict
+    packages : dict
+        keyed on package name (e.g., twisted-16.0.0-py35_0.tar.bz2)
+    """
+    url_template, channel = _maybe_split_channel(channel)
+    url = url_template.format(channel=channel, platform=platform,
+                              file_name='repodata.json')
+    json = requests.get(url).json()
+    return json.get('info', {}), json.get('packages', {})
 
 
 def _download(url, target_directory, package_metadata=None, validate=True,
               chunk_size=None):
+    """Download `url` to `target_directory`
+
+    Parameters
+    ----------
+    url : str
+        The url to download
+    target_directory : str
+        The path to a directory where `url` should be downloaded
+    package_metadata : dict, optional
+        package metadata from repodata.json. Will be used for validation of
+        the downloaded package. If None, then validation is skipped
+    validate : bool, optional
+        True: Perform package validation if `package_metadata` is provided.
+        Defaults to True.
+    chunk_size : int, optional
+        The size in Bytes to chunk the download iterator. Defaults to 1024 (1KB)
+    """
     if chunk_size is None:
         chunk_size = 1024  # 1KB chunks
     logger.info("download_url=%s", url)
@@ -273,52 +344,57 @@ def _download(url, target_directory, package_metadata=None, validate=True,
 
 
 def _list_conda_packages(local_dir):
+    """List the conda packages (*.tar.bz2 files) in `local_dir
+
+    Parameters
+    ----------
+    local_dir : str
+        Some local directory with (hopefully) some conda packages in it
+
+    Returns
+    -------
+    list
+        List of conda packages in `local_dir`
+    """
     contents = os.listdir(local_dir)
     return fnmatch.filter(contents, "*.tar.bz2")
 
 
 def _validate_packages(repodata, package_directory):
+    """Validate local conda packages.
+
+    NOTE: This is slow.
+    NOTE2: This will remove any packages that are in `package_directory` that
+           are not in `repodata`
+
+    Parameters
+    ----------
+    repodata : dict
+        The contents of repodata.json
+    package_directory : str
+        Path to the local repo that contains conda packages
+    """
+    packages = repodata['packages']
     # validate local conda packages
     local_packages = _list_conda_packages(package_directory)
-    for package in local_packages:
+    for idx, package in enumerate(local_packages):
         # ensure the packages in this directory are in the upstream
         # repodata.json
         try:
-            info = repodata[package]
+            package_metadata = packages[package]
         except KeyError:
             logger.warning("%s is not in the upstream index. Removing...",
-                            package)
+                           package)
             _remove_package(os.path.join(package_directory, package))
         else:
             # validate the integrity of the package, the size of the package and
             # its hashes
-            logger.info('Validating %s', package)
+            logger.info('Validating %s. %s of %s', package, idx,
+                        len(local_packages))
             _validate(os.path.join(package_directory, package),
-                      md5=info.get('md5'), sha256=info.get('sha256'),
-                      size=info.get('size'))
-
-
-def update_download_url(channel):
-    """Update the download url if channel is a fully qualified channel
-
-    Parameters
-    ----------
-    channel : str
-        The channel to mirror. Can be an anaconda channel (e.g., conda-forge)
-        at which point this function is a no-op. If it is a fully qualified
-        channel, however, the global DOWNLOAD_URL will be updated to be a
-        template based on that fully qualified channel.
-        e.g., https://repo.continuum.io/pkgs/free
-        will become
-        https://repo.continuum.io/pkgs/{channel}/{platform}/{filename}
-        where channel == free
-    """
-    if channel.startswith('http'):
-        # then we need to assume it is a full url including the channel
-        download_url, channel = channel.rsplit('/', 1)
-        global DOWNLOAD_URL
-        DOWNLOAD_URL = download_url + "/{channel}/{platform}/{file_name}"
-    return channel
+                      md5=package_metadata.get('md5'),
+                      sha256=package_metadata.get('sha256'),
+                      size=package_metadata.get('size'))
 
 
 def main(upstream_channel, target_directory, temp_directory, platform,
@@ -329,7 +405,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     ----------
     upstream_channel : str
         The anaconda.org channel that you want to mirror locally
-        e.g., "anaconda" or "conda-forge"
+        e.g., "conda-forge" or
+        the defaults channel at "https://repo.continuum.io/pkgs/free"
     target_directory : str
         The path on disk to produce a local mirror of the upstream channel.
         Note that this is the directory that contains the platform
@@ -339,9 +416,9 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         store the packages before moving them to the target_directory to
         apply checks
     platform : str
-        The platform that you want to mirror from
-        anaconda.org/<upstream_channel>
-        The options are listed in the module level global "DEFAULT_PLATFORMS"
+        The platform that you wish to mirror for. Common options are
+        'linux-64', 'osx-64', 'win-64' and 'win-32'. Any platform is valid as
+        long as the url resolves.
     blacklist : iterable of tuples
         The values of blacklist should be (key, glob) where key is one of the
         keys in the repodata['packages'] dicts and glob is a thing to match
@@ -390,13 +467,13 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # 8. download repodata.json and repodata.json.bz2
     # 9. copy new repodata.json and repodata.json.bz2 into the repo
 
-    upstream_channel = update_download_url(upstream_channel)
+    download_url, upstream_channel = _maybe_split_channel(upstream_channel)
 
-
-        # Implementation:
+    # Implementation:
     if not os.path.exists(os.path.join(target_directory, platform)):
         os.makedirs(os.path.join(target_directory, platform))
-    info, repodata = get_repodata(upstream_channel, platform)
+
+    info, packages = get_repodata(download_url, upstream_channel, platform)
     local_directory = os.path.join(target_directory, platform)
 
     # 1. validate local repo
@@ -412,7 +489,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         logger.debug("blacklist")
         blacklist_packages = {}
         for blist in blacklist:
-            matched_packages = _match(repodata, blist)
+            matched_packages = _match(packages, blist)
             blacklist_packages.update(matched_packages)
         logger.debug(pformat(sorted(blacklist_packages)))
 
@@ -422,7 +499,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         logger.debug("whitelist")
         whitelist_packages = {}
         for wlist in whitelist:
-            matched_packages = _match(repodata, wlist)
+            matched_packages = _match(packages, wlist)
             whitelist_packages.update(matched_packages)
         logger.debug(pformat(sorted(whitelist_packages)))
     # make final mirror list of not-blacklist + whitelist
@@ -430,7 +507,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         whitelist_packages.keys())
     logger.debug('true blacklist')
     logger.debug(pformat(sorted(whitelist_packages)))
-    possible_packages_to_mirror = set(repodata.keys()) - true_blacklist
+    possible_packages_to_mirror = set(packages.keys()) - true_blacklist
     logger.debug('possible_packages_to_mirror')
     logger.debug(pformat(sorted(possible_packages_to_mirror)))
 
@@ -457,38 +534,32 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     with tempfile.TemporaryDirectory(dir=temp_directory) as download_dir:
         logger.info('downloading to the tempdir %s', download_dir)
         for package_name in sorted(to_mirror):
-            url = DOWNLOAD_URL.format(
+            url = download_url.format(
                 channel=upstream_channel,
-                name=repodata[package_name]['name'],
-                version=repodata[package_name]['version'],
                 platform=platform,
                 file_name=package_name)
-            _download(url, download_dir, repodata)
+            _download(url, download_dir, packages)
 
         # validate all packages in the download directory
-        _validate_packages(repodata, download_dir)
+        _validate_packages(packages, download_dir)
         logger.debug('contents of %s are %s',
-                      download_dir,
-                      pformat(os.listdir(download_dir)))
+                     download_dir,
+                     pformat(os.listdir(download_dir)))
 
-        # 8. download repodata.json
-        url = REPODATA.format(channel=upstream_channel, platform=platform)
-        _download(url, download_dir, validate=False)
-
-        # prune the repodata.json file of packages we don't want
+        # 8. Use already downloaded repodata.json contents but prune it of
+        # packages we don't want
         repodata_path = os.path.join(download_dir, 'repodata.json')
 
-        # load the json into a python dictionary
-        with open(repodata_path, 'r') as f:
-            rd = json.load(f)
+        repodata = {'info': info, 'packages': packages}
         # compute the packages that we have locally
         packages_we_have = set(local_packages +
                                _list_conda_packages(download_dir))
         # remake the packages dictionary with only the packages we have
         # locally
-        rd['packages'] = {name: info for name, info in
-                          rd['packages'].items()
-                          if name in packages_we_have}
+        repodata['packages'] = {
+            name: info for name, info in repodata['packages'].items()
+            if name in packages_we_have}
+
         # move new conda packages
         for f in _list_conda_packages(download_dir):
             old_path = os.path.join(download_dir, f)
@@ -496,7 +567,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
             logger.info("moving %s to %s", old_path, new_path)
             shutil.move(old_path, new_path)
 
-        data = json.dumps(rd, indent=2, sort_keys=True)
+        data = json.dumps(repodata, indent=2, sort_keys=True)
         # strip trailing whitespace
         data = '\n'.join(line.rstrip() for line in data.splitlines())
         # make sure we have newline at the end
