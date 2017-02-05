@@ -365,7 +365,7 @@ def _list_conda_packages(local_dir):
     return fnmatch.filter(contents, "*.tar.bz2")
 
 
-def _validate_packages(repodata, package_directory):
+def _validate_packages(package_repodata, package_directory):
     """Validate local conda packages.
 
     NOTE: This is slow.
@@ -374,19 +374,18 @@ def _validate_packages(repodata, package_directory):
 
     Parameters
     ----------
-    repodata : dict
+    package_repodata : dict
         The contents of repodata.json
     package_directory : str
         Path to the local repo that contains conda packages
     """
-    packages = repodata['packages']
     # validate local conda packages
     local_packages = _list_conda_packages(package_directory)
     for idx, package in enumerate(local_packages):
         # ensure the packages in this directory are in the upstream
         # repodata.json
         try:
-            package_metadata = packages[package]
+            package_metadata = package_repodata[package]
         except KeyError:
             logger.warning("%s is not in the upstream index. Removing...",
                            package)
@@ -472,13 +471,11 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # 8. download repodata.json and repodata.json.bz2
     # 9. copy new repodata.json and repodata.json.bz2 into the repo
 
-    download_url, upstream_channel = _maybe_split_channel(upstream_channel)
-
     # Implementation:
     if not os.path.exists(os.path.join(target_directory, platform)):
         os.makedirs(os.path.join(target_directory, platform))
 
-    info, packages = get_repodata(download_url, upstream_channel, platform)
+    info, packages = get_repodata(upstream_channel, platform)
     local_directory = os.path.join(target_directory, platform)
 
     # 1. validate local repo
@@ -536,11 +533,12 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # b. validate contents of temp file
     # c. move to local repo
     # mirror all new packages
+    download_url, channel = _maybe_split_channel(upstream_channel)
     with tempfile.TemporaryDirectory(dir=temp_directory) as download_dir:
         logger.info('downloading to the tempdir %s', download_dir)
         for package_name in sorted(to_mirror):
             url = download_url.format(
-                channel=upstream_channel,
+                channel=channel,
                 platform=platform,
                 file_name=package_name)
             _download(url, download_dir, packages)
@@ -564,6 +562,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         repodata['packages'] = {
             name: info for name, info in repodata['packages'].items()
             if name in packages_we_have}
+        _write_repodata(download_dir, repodata)
 
         # move new conda packages
         for f in _list_conda_packages(download_dir):
@@ -572,26 +571,36 @@ def main(upstream_channel, target_directory, temp_directory, platform,
             logger.info("moving %s to %s", old_path, new_path)
             shutil.move(old_path, new_path)
 
-        data = json.dumps(repodata, indent=2, sort_keys=True)
-        # strip trailing whitespace
-        data = '\n'.join(line.rstrip() for line in data.splitlines())
-        # make sure we have newline at the end
-        if not data.endswith('\n'):
-            data += '\n'
-
-        with open(os.path.join(download_dir,
-                               'repodata.json'), 'w') as fo:
-            fo.write(data)
-        # compress repodata.json into the bz2 format. some conda commands still
-        # need it
-        with open(os.path.join(download_dir,
-                               'repodata.json.bz2'), 'wb') as fo:
-            fo.write(bz2.compress(data.encode('utf-8')))
-
         for f in ('repodata.json', 'repodata.json.bz2'):
             download_path = os.path.join(download_dir, f)
             move_path = os.path.join(local_directory, f)
             shutil.move(download_path, move_path)
+
+    # Also need to make a "noarch" channel or conda gets mad
+    noarch_path = os.path.join(target_directory, 'noarch')
+    if not os.path.exists(noarch_path):
+        os.makedirs(noarch_path, exist_ok=True)
+        noarch_repodata = {'info': {}, 'packages': {}}
+        _write_repodata(noarch_path, noarch_repodata)
+
+
+def _write_repodata(package_dir, repodata_dict):
+    data = json.dumps(repodata_dict, indent=2, sort_keys=True)
+    # strip trailing whitespace
+    data = '\n'.join(line.rstrip() for line in data.splitlines())
+    # make sure we have newline at the end
+    if not data.endswith('\n'):
+        data += '\n'
+
+    with open(os.path.join(package_dir,
+                           'repodata.json'), 'w') as fo:
+        fo.write(data)
+
+    # compress repodata.json into the bz2 format. some conda commands still
+    # need it
+    bz2_path = os.path.join(package_dir, 'repodata.json.bz2')
+    with open(bz2_path, 'wb') as fo:
+        fo.write(bz2.compress(data.encode('utf-8')))
 
 
 if __name__ == "__main__":
