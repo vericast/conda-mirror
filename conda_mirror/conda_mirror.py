@@ -153,6 +153,12 @@ def _make_arg_parser():
         help="Enable PDB debugging on exception",
         default=False,
     )
+    ap.add_argument(
+        '--version',
+        action="store_true",
+        help="Print version and quit",
+        default=False,
+    )
     return ap
 
 
