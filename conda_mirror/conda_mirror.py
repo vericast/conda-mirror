@@ -216,7 +216,7 @@ def cli():
          args.platform, blacklist, whitelist)
 
 
-def _remove_package(pkg_path):
+def _remove_package(pkg_path, reason=None):
     """
     Log and remove a package.
 
@@ -225,7 +225,11 @@ def _remove_package(pkg_path):
     pkg_path : str
         Path to a conda package that should be removed
     """
-    logger.info("Removing: {}".format(pkg_path))
+    if reason is None:
+        reason = "No reason given"
+    msg = "Removing: %s. Reason: %s"
+    logger.info(msg, pkg_path, reason)
+    print(msg % (pkg_path, reason), file=sys.stderr)
     os.remove(pkg_path)
 
 
@@ -255,7 +259,7 @@ def _validate(filename, md5=None, sha256=None, size=None):
         logger.debug("tarfile error encountered. Original error below.")
         logger.debug(pformat(traceback.format_exc()))
         logger.warning("Removing package: %s", filename)
-        _remove_package(filename)
+        _remove_package(filename, reason="Tarfile read failure")
         return
 
     def _get_output(cmd):
@@ -273,7 +277,7 @@ def _validate(filename, md5=None, sha256=None, size=None):
             logger.error("%s != %s", left, right)
             logger.error(pformat(traceback.format_exc()))
             logger.error("Removing package %s", filename)
-            _remove_package(filename)
+            _remove_package(filename, reason="Failed %s test" % assertion_test)
             return True
         else:
             logger.debug('%s check passed', assertion_test)
@@ -395,7 +399,8 @@ def _validate_packages(package_repodata, package_directory):
         except KeyError:
             logger.warning("%s is not in the upstream index. Removing...",
                            package)
-            _remove_package(os.path.join(package_directory, package))
+            _remove_package(os.path.join(package_directory, package),
+                            reason="Package is not in the repodata index")
         else:
             # validate the integrity of the package, the size of the package and
             # its hashes
@@ -525,7 +530,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # if any are not in the final mirror list, remove them
     for package_name in local_packages:
         if package_name in true_blacklist:
-            _remove_package(os.path.join(local_directory, package_name))
+            _remove_package(os.path.join(local_directory, package_name),
+                            reason="Package is blacklisted")
     # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
     # mirror list
