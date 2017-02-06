@@ -16,10 +16,8 @@ def repodata():
     repodata = {}
     repodata['conda-forge'] = conda_mirror.get_repodata('conda-forge',
                                                         'linux-64')
-    original_download_url = conda_mirror.DOWNLOAD_URL
-    conda_mirror.update_download_url(anaconda_channel)
-    repodata[anaconda_channel] = conda_mirror.get_repodata('free', 'linux-64')
-    conda_mirror.DOWNLOAD_URL = original_download_url
+    repodata[anaconda_channel] = conda_mirror.get_repodata(anaconda_channel,
+                                                           'linux-64')
     return repodata
 
 
