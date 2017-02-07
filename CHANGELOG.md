@@ -1,26 +1,42 @@
 # Change Log
 
-## [Unreleased](https://github.com/maxpoint/conda-mirror/tree/HEAD)
+## [0.6.2](https://github.com/maxpoint/conda-mirror/tree/0.6.2) (2017-02-07)
 
-[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.6.0...HEAD)
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.6.1...HEAD)
+
+**Closed issues:**
+
+- Mirror pro repo [\#24](https://github.com/maxpoint/conda-mirror/issues/24)
+
+**Merged pull requests:**
+
+- Handle fully qualified channels [\#25](https://github.com/maxpoint/conda-mirror/pull/25) ([ericdill](https://github.com/ericdill))
+
+## [0.6.1](https://github.com/maxpoint/conda-mirror/tree/0.6.1) (2017-01-18)
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.6.0...0.6.1)
 
 **Closed issues:**
 
 - Validate that there is enough space to actually perform the mirror [\#19](https://github.com/maxpoint/conda-mirror/issues/19)
+
+**Merged pull requests:**
+
+- MNT: Fix the download url for anaconda/defaults [\#23](https://github.com/maxpoint/conda-mirror/pull/23) ([ericdill](https://github.com/ericdill))
+- DOC/MNT: Remove dead code. Update readme. Update changelog [\#22](https://github.com/maxpoint/conda-mirror/pull/22) ([ericdill](https://github.com/ericdill))
 
 ## [0.6.0](https://github.com/maxpoint/conda-mirror/tree/0.6.0) (2017-01-10)
 [Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.5.1...0.6.0)
 
 **Merged pull requests:**
 
-- Implement optional cli flag for temp download directory [\#21](https://github.com/maxpoint/conda-mirror/pull/21) ([jneines](https://github.com/jneines))
+- Update conda\_mirror.py [\#21](https://github.com/maxpoint/conda-mirror/pull/21) ([jneines](https://github.com/jneines))
 
 ## [0.5.1](https://github.com/maxpoint/conda-mirror/tree/0.5.1) (2017-01-03)
 [Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.5.0...0.5.1)
 
 **Merged pull requests:**
 
-- Download repodata to temp dir first, then move it [\#20](https://github.com/maxpoint/conda-mirror/pull/20) ([ericdill](https://github.com/ericdill))
+- download repodata to temp dir first, then move it [\#20](https://github.com/maxpoint/conda-mirror/pull/20) ([ericdill](https://github.com/ericdill))
 
 ## [0.5.0](https://github.com/maxpoint/conda-mirror/tree/0.5.0) (2016-12-19)
 [Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.4.6...0.5.0)
@@ -37,22 +53,14 @@
 ## [0.4.6](https://github.com/maxpoint/conda-mirror/tree/0.4.6) (2016-12-15)
 [Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.4.5...0.4.6)
 
-- Prune repodata.json of packages we do not have locally [957f662](https://github.com/maxpoint/conda-mirror/commit/957f66260a8e91c7217656ab721db52b9bc27aa1)
-
 ## [0.4.5](https://github.com/maxpoint/conda-mirror/tree/0.4.5) (2016-12-15)
 [Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.4.4...0.4.5)
-
-- (Performance) Short-circuit the validation if one of the checks fail [68ebd00](https://github.com/maxpoint/conda-mirror/commit/68ebd00e8747a504d00bfd4304e480afcbf7b24b)
 
 ## [0.4.4](https://github.com/maxpoint/conda-mirror/tree/0.4.4) (2016-12-15)
 [Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.4.3...0.4.4)
 
-- (Performance) Don't validate the entire repo every time (c811397)[https://github.com/maxpoint/conda-mirror/commit/c8113976b80af7e789814d8b9095ece8e5481879]
-
 ## [0.4.3](https://github.com/maxpoint/conda-mirror/tree/0.4.3) (2016-12-15)
 [Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.4.2...0.4.3)
-
-- Show output of subprocess calls on failure [e8ba6d4](https://github.com/maxpoint/conda-mirror/commit/e8ba6d4e01febaae5b08127ef71d36a3533b368b)
 
 ## [0.4.2](https://github.com/maxpoint/conda-mirror/tree/0.4.2) (2016-12-13)
 [Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.4.1...0.4.2)
