@@ -138,9 +138,10 @@ def _make_arg_parser():
     )
     ap.add_argument(
         '-v', '--verbose',
-        action="store_true",
-        help="Show even more output. As if I'm not already chatty enough!",
-        default=False,
+        action="count",
+        help=("logging defaults to error/exception only. Takes up to three "
+              "'-v' flags. '-v': warning. '-vv': info. '-vvv': debug."),
+        default=0,
     )
     ap.add_argument(
         '--config',
@@ -162,13 +163,17 @@ def _make_arg_parser():
     return ap
 
 
-def cli():
-    """
-    Collect arguments from sys.argv and invoke the main() function.
-    """
-    loglevel = logging.INFO
+def _init_logger(verbosity):
+    # set up the logger
     global logger
     logger = logging.getLogger('conda_mirror')
+    logmap = {0: logging.ERROR,
+              1: logging.WARNING,
+              2: logging.INFO,
+              3: logging.DEBUG}
+    loglevel = logmap.get(verbosity, '3')
+
+    # clear all handlers
     for handler in logger.handlers:
         logger.removeHandler(handler)
     logger.setLevel(loglevel)
@@ -180,9 +185,20 @@ def cli():
 
     logger.addHandler(stream_handler)
 
-    logger.debug(sys.argv)
+    print("Log level set to %s" % logging.getLevelName(logmap[verbosity]),
+          file=sys.stdout)
+
+
+def cli():
+    """
+    Collect arguments from sys.argv and invoke the main() function.
+    """
     parser = _make_arg_parser()
     args = parser.parse_args()
+
+    _init_logger(args.verbose)
+    logger.debug('sys.argv: %s', sys.argv)
+
     if args.version:
         from . import __version__
         print(__version__)
@@ -192,11 +208,6 @@ def cli():
         if not getattr(args, required):
             logger.error("Missing required argument: %s", required)
             return
-
-    if args.verbose:
-        logger.setLevel(logging.DEBUG)
-        stream_handler.setLevel(logging.DEBUG)
-
     if args.pdb:
         # set the pdb_hook as the except hook for all exceptions
         def pdb_hook(exctype, value, traceback):
@@ -228,9 +239,29 @@ def _remove_package(pkg_path, reason=None):
     if reason is None:
         reason = "No reason given"
     msg = "Removing: %s. Reason: %s"
-    logger.info(msg, pkg_path, reason)
-    print(msg % (pkg_path, reason), file=sys.stderr)
+    logger.warning(msg, pkg_path, reason)
     os.remove(pkg_path)
+
+
+def _assert_or_remove(left, right, assertion_test, filename):
+    try:
+        assert left == right
+    except AssertionError:
+        logger.info("Package validation failed for %s: %s != %s",
+                    assertion_test, left, right,
+                    exc_info=True)
+        _remove_package(filename, reason="Failed %s test" % assertion_test)
+        return True
+    else:
+        logger.debug('%s check passed', assertion_test)
+
+
+def _get_output(cmd):
+    try:
+        return subprocess.check_output(cmd).decode().strip().split()[0]
+    except subprocess.CalledProcessError as cpe:
+        logger.exception(cpe.output.decode())
+        return ""
 
 
 def _validate(filename, md5=None, sha256=None, size=None):
@@ -258,30 +289,8 @@ def _validate(filename, md5=None, sha256=None, size=None):
     except tarfile.TarError:
         logger.debug("tarfile error encountered. Original error below.")
         logger.debug(pformat(traceback.format_exc()))
-        logger.warning("Removing package: %s", filename)
         _remove_package(filename, reason="Tarfile read failure")
         return
-
-    def _get_output(cmd):
-        try:
-            return subprocess.check_output(cmd).decode().strip().split()[0]
-        except subprocess.CalledProcessError as cpe:
-            logger.error(cpe.output.decode())
-            return ""
-
-    def _assert_or_remove(left, right, assertion_test):
-        try:
-            assert left == right
-        except AssertionError:
-            logger.error("Package validation failed for %s", assertion_test)
-            logger.error("%s != %s", left, right)
-            logger.error(pformat(traceback.format_exc()))
-            logger.error("Removing package %s", filename)
-            _remove_package(filename, reason="Failed %s test" % assertion_test)
-            return True
-        else:
-            logger.debug('%s check passed', assertion_test)
-
     checks = [
         (size, lambda: os.stat(filename).st_size, 'size'),
         (md5, lambda: _get_output(['md5sum', filename]), 'md5'),
@@ -289,7 +298,8 @@ def _validate(filename, md5=None, sha256=None, size=None):
     ]
     for target, validate_function, description in checks:
         if target is not None:
-            if _assert_or_remove(target, validate_function(), description):
+            if _assert_or_remove(target, validate_function(), description,
+                                 filename):
                 return
 
 
