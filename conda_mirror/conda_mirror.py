@@ -373,7 +373,7 @@ def _download(url, target_directory, package_metadata=None, validate=True,
 
 
 def _list_conda_packages(local_dir):
-    """List the conda packages (*.tar.bz2 files) in `local_dir
+    """List the conda packages (*.tar.bz2 files) in `local_dir`
 
     Parameters
     ----------
@@ -394,7 +394,8 @@ def _validate_packages(package_repodata, package_directory):
 
     NOTE: This is slow.
     NOTE2: This will remove any packages that are in `package_directory` that
-           are not in `repodata`
+           are not in `repodata` and also any packages that fail the package
+           validation
 
     Parameters
     ----------
