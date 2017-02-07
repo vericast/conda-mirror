@@ -3,12 +3,9 @@ language: python
 python:
 - 3.4
 - 3.5
+- 3.6
 
 install:
-- git clone https://github.com/ericdill/ci ~/scripts
-- . ~/scripts/install-miniconda.sh
-- conda install python=$TRAVIS_PYTHON_VERSION pip conda-build
-- conda update --all
 - pip install -r test-requirements.txt
 - pip install codecov
 - pip install -e .
