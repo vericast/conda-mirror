@@ -262,6 +262,10 @@ def _get_output(cmd):
     except subprocess.CalledProcessError as cpe:
         logger.exception(cpe.output.decode())
         return ""
+    except Exception:
+        msg = "Error in subprocess.check_output. cmd: '%s'"
+        logger.exception(msg, ' '.join(cmd))
+        return ""
 
 
 def _validate(filename, md5=None, sha256=None, size=None):
