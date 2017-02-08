@@ -426,14 +426,16 @@ def _validate_packages(repodata_packages_metadata, package_directory,
                            md5=package_metadata.get('md5'),
                            sha256=package_metadata.get('sha256'),
                            size=package_metadata.get('size'))
-        if result and update_repodata:
-            import pdb
-            pdb.set_trace()
-            repodata_path = os.path.join(package_directory, 'repodata.json')
-            with open(repodata_path, 'r') as f:
-                repodata = json.load(f)
-                del repodata['packages'][package]
-                _write_repodata(package_directory, repodata)
+        if result:
+            _remove_package(
+                os.path.join(package_directory, package),
+                reason="{2} check failed because {0}!={1}".format(*result))
+            if update_repodata:
+                repodata_path = os.path.join(package_directory, 'repodata.json')
+                with open(repodata_path, 'r') as f:
+                    repodata = json.load(f)
+                    del repodata['packages'][package]
+                    _write_repodata(package_directory, repodata)
 
 
 def main(upstream_channel, target_directory, temp_directory, platform,
