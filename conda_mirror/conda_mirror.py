@@ -298,16 +298,9 @@ def _validate(filename, md5=None, sha256=None, size=None):
         if target is not None:
             validation_output = validate_function()
             try:
-                assert target == validation_output
+                assert target == validation_output, description
             except AssertionError:
-                logger.info("Package validation failed for %s: %s != %s",
-                            description, target, validation_output,
-                            exc_info=True)
-                remove_message = "Failed %s test" % description
-                _remove_package(filename, reason=remove_message)
-                return remove_message
-            else:
-                logger.debug('%s check passed', description)
+                return target, validation_output, description
 
 
 def get_repodata(channel, platform):
@@ -414,7 +407,7 @@ def _validate_packages(repodata_packages_metadata, package_directory,
     """
     # validate local conda packages
     local_packages = _list_conda_packages(package_directory)
-    for idx, package in enumerate(local_packages):
+    for idx, package in enumerate(sorted(local_packages)):
         # ensure the packages in this directory are in the upstream
         # repodata.json
         try:
@@ -434,6 +427,8 @@ def _validate_packages(repodata_packages_metadata, package_directory,
                            sha256=package_metadata.get('sha256'),
                            size=package_metadata.get('size'))
         if result and update_repodata:
+            import pdb
+            pdb.set_trace()
             repodata_path = os.path.join(package_directory, 'repodata.json')
             with open(repodata_path, 'r') as f:
                 repodata = json.load(f)
