@@ -548,6 +548,12 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     logger.debug('possible_packages_to_mirror')
     logger.debug(pformat(sorted(possible_packages_to_mirror)))
 
+    # 3. Validate all files locally
+    ideal_repodata = {
+        pkg_name: pkg_info for pkg_name, pkg_info in packages.items()
+        if pkg_name in possible_packages_to_mirror}
+    _validate_packages(ideal_repodata, local_directory, update_repodata=True)
+
     # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
     # mirror list
@@ -582,7 +588,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         info, packages = get_repodata(channel, platform)
         repodata = {'info': info, 'packages': packages}
         # compute the packages that we have locally
-        packages_we_have = set(local_packages +
+        packages_we_have = set(_list_conda_packages(local_directory) +
                                _list_conda_packages(download_dir))
         # remake the packages dictionary with only the packages we have
         # locally
