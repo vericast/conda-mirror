@@ -54,9 +54,6 @@ def cli():
                 for idx, pkg in enumerate(conda_packages))
     start = time.time()
     need_attention = []
-    print_every = len(conda_packages) / 100
-    if print_every < 100:
-        print_every = 100
     with Pool(int(args.num_workers)) as p:
         for i, ret in enumerate(p.imap_unordered(validate, pkg_iter)):
             elapsed = int(time.time()) - int(start) or 1
@@ -67,8 +64,8 @@ def cli():
             if not args.cron:
                 sys.stderr.write('\r%s' % msg)
             else:
-                if i % print_every  == 0:
-                    print('%s\n'% msg)
+                if i % 100  == 0:
+                    print('%s'% msg)
             if ret is not None:
                 need_attention.append(ret)
     print('\n%s packages need attention' % len(need_attention))
