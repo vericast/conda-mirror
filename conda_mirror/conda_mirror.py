@@ -139,9 +139,15 @@ def _make_arg_parser():
     ap.add_argument(
         '-v', '--verbose',
         action="count",
-        help=("logging defaults to error/exception only. Takes up to three "
-              "'-v' flags. '-v': warning. '-vv': info. '-vvv': debug."),
+        help=("logging defaults to warning. Takes up to two '-v' flags."
+              "'-v': info. '-vv': debug."),
         default=0,
+    )
+    ap.add_argument(
+        '-q', '--quiet',
+        action="store_true",
+        help="Show less logs. Only report ERROR level logs",
+        default=False,
     )
     ap.add_argument(
         '--config',
@@ -159,13 +165,6 @@ def _make_arg_parser():
         action="store_true",
         help="Print version and quit",
         default=False,
-    )
-    ap.add_argument(
-        '--validate-local-channel',
-        action="store_false",
-        help="Validate the conda packages in the local mirror. Note that will "
-             "take a few seconds per package",
-        default=True
     )
     return ap
 
@@ -202,8 +201,12 @@ def cli():
     """
     parser = _make_arg_parser()
     args = parser.parse_args()
+    if args.quiet:
+        loglevel = 0
+    else:
+        loglevel = args.verbose + 1
 
-    _init_logger(args.verbose)
+    _init_logger(loglevel)
     logger.debug('sys.argv: %s', sys.argv)
 
     if args.version:
@@ -231,7 +234,7 @@ def cli():
     whitelist = config_dict.get('whitelist')
 
     main(args.upstream_channel, args.target_directory, args.temp_directory,
-         args.platform, blacklist, whitelist, args.validate_local_channel)
+         args.platform, blacklist, whitelist)
 
 
 def _remove_package(pkg_path, reason=None):
@@ -439,7 +442,7 @@ def _validate_packages(repodata_packages_metadata, package_directory,
 
 
 def main(upstream_channel, target_directory, temp_directory, platform,
-         blacklist=None, whitelist=None, validate_local_channel=False):
+         blacklist=None, whitelist=None):
     """
 
     Parameters
@@ -468,10 +471,6 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         The values of blacklist should be (key, glob) where key is one of the
         keys in the repodata['packages'] dicts and glob is a thing to match
         on.  Note that all comparisons will be laundered through lowercasing.
-    validate_local_channel : bool, optional
-        True: Validate the contents of the local mirror against all possible
-        info contained in the package metadata in repodata.json. This is
-        pretty darn slow. Takes a few seconds per package.
 
     Notes
     -----
@@ -549,17 +548,6 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     logger.debug('possible_packages_to_mirror')
     logger.debug(pformat(sorted(possible_packages_to_mirror)))
 
-    # 3. Validate local channel before mirroring new packages
-    if validate_local_channel:
-        if not os.path.isdir(local_directory):
-            logger.warning("validate_local_channel is set to %s but the local "
-                           "mirror does not appear to exist: %s",
-                           validate_local_channel, local_directory)
-        else:
-            allowed_package_metadata = {k: packages[k] for k in
-                                        possible_packages_to_mirror}
-            _validate_packages(allowed_package_metadata, local_directory)
-
     # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
     # mirror list
@@ -591,7 +579,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
 
         # 8. Use the repodata we have in ram, but prune it of packages
         # we don't want
-
+        info, packages = get_repodata(channel, platform)
         repodata = {'info': info, 'packages': packages}
         # compute the packages that we have locally
         packages_we_have = set(local_packages +

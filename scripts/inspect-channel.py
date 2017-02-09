@@ -13,9 +13,9 @@ cm._init_logger(3)
 METADATA="No metadata found"
 PACKAGE_VALIDATION="Validation failed"
 
+
 def validate(pkg_tuple):
-    package_path, package_metadata, idx, total = pkg_tuple
-#    print('%s of %s. validating %s' % (idx, total, package_path))
+    package_path, package_metadata = pkg_tuple
     if package_metadata is None:
         return package_path, METADATA, ""
     ret = cm._validate(package_path,
@@ -50,7 +50,7 @@ def cli():
         repodata = json.load(f)
 
     conda_packages = cm._list_conda_packages(args.pkgs_dir)
-    pkg_iter = ((join(args.pkgs_dir, pkg), repodata['packages'].get(pkg), idx, len(conda_packages))
+    pkg_iter = ((join(args.pkgs_dir, pkg), repodata['packages'].get(pkg))
                 for idx, pkg in enumerate(conda_packages))
     start = time.time()
     need_attention = []
