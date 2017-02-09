@@ -139,9 +139,15 @@ def _make_arg_parser():
     ap.add_argument(
         '-v', '--verbose',
         action="count",
-        help=("logging defaults to error/exception only. Takes up to three "
-              "'-v' flags. '-v': warning. '-vv': info. '-vvv': debug."),
+        help=("logging defaults to warning. Takes up to two '-v' flags."
+              "'-v': info. '-vv': debug."),
         default=0,
+    )
+    ap.add_argument(
+        '-q', '--quiet',
+        action="store_true",
+        help="Show less logs. Only report ERROR level logs",
+        default=False,
     )
     ap.add_argument(
         '--config',
@@ -195,8 +201,12 @@ def cli():
     """
     parser = _make_arg_parser()
     args = parser.parse_args()
+    if args.quiet:
+        loglevel = 0
+    else:
+        loglevel = args.verbose + 1
 
-    _init_logger(args.verbose)
+    _init_logger(loglevel)
     logger.debug('sys.argv: %s', sys.argv)
 
     if args.version:
@@ -241,19 +251,6 @@ def _remove_package(pkg_path, reason=None):
     msg = "Removing: %s. Reason: %s"
     logger.warning(msg, pkg_path, reason)
     os.remove(pkg_path)
-
-
-def _assert_or_remove(left, right, assertion_test, filename):
-    try:
-        assert left == right
-    except AssertionError:
-        logger.info("Package validation failed for %s: %s != %s",
-                    assertion_test, left, right,
-                    exc_info=True)
-        _remove_package(filename, reason="Failed %s test" % assertion_test)
-        return True
-    else:
-        logger.debug('%s check passed', assertion_test)
 
 
 def _get_output(cmd):
@@ -302,9 +299,11 @@ def _validate(filename, md5=None, sha256=None, size=None):
     ]
     for target, validate_function, description in checks:
         if target is not None:
-            if _assert_or_remove(target, validate_function(), description,
-                                 filename):
-                return
+            validation_output = validate_function()
+            try:
+                assert target == validation_output, description
+            except AssertionError:
+                return target, validation_output, description
 
 
 def get_repodata(channel, platform):
@@ -389,7 +388,8 @@ def _list_conda_packages(local_dir):
     return fnmatch.filter(contents, "*.tar.bz2")
 
 
-def _validate_packages(package_repodata, package_directory):
+def _validate_packages(repodata_packages_metadata, package_directory,
+                       update_repodata=True):
     """Validate local conda packages.
 
     NOTE: This is slow.
@@ -399,32 +399,46 @@ def _validate_packages(package_repodata, package_directory):
 
     Parameters
     ----------
-    package_repodata : dict
-        The contents of repodata.json
+    repodata_packages_metadata : dict
+        The value of the 'repodata' key in repodata.json
     package_directory : str
         Path to the local repo that contains conda packages
+    update_repodata : bool, optional
+        True: Atomically update repodata.json every time a package is removed
+        that fails its validation checks
+        Defaults to True.
     """
     # validate local conda packages
     local_packages = _list_conda_packages(package_directory)
-    for idx, package in enumerate(local_packages):
+    for idx, package in enumerate(sorted(local_packages)):
         # ensure the packages in this directory are in the upstream
         # repodata.json
         try:
-            package_metadata = package_repodata[package]
+            package_metadata = repodata_packages_metadata[package]
         except KeyError:
             logger.warning("%s is not in the upstream index. Removing...",
                            package)
             _remove_package(os.path.join(package_directory, package),
                             reason="Package is not in the repodata index")
-        else:
-            # validate the integrity of the package, the size of the package and
-            # its hashes
-            logger.info('Validating %s. %s of %s', package, idx,
-                        len(local_packages))
-            _validate(os.path.join(package_directory, package),
-                      md5=package_metadata.get('md5'),
-                      sha256=package_metadata.get('sha256'),
-                      size=package_metadata.get('size'))
+            continue
+        # validate the integrity of the package, the size of the package and
+        # its hashes
+        logger.info('Validating %s. %s of %s', package, idx,
+                    len(local_packages))
+        result = _validate(os.path.join(package_directory, package),
+                           md5=package_metadata.get('md5'),
+                           sha256=package_metadata.get('sha256'),
+                           size=package_metadata.get('size'))
+        if result:
+            _remove_package(
+                os.path.join(package_directory, package),
+                reason="{2} check failed because {0}!={1}".format(*result))
+            if update_repodata:
+                repodata_path = os.path.join(package_directory, 'repodata.json')
+                with open(repodata_path, 'r') as f:
+                    repodata = json.load(f)
+                    del repodata['packages'][package]
+                    _write_repodata(package_directory, repodata)
 
 
 def main(upstream_channel, target_directory, temp_directory, platform,
@@ -449,11 +463,11 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         The platform that you wish to mirror for. Common options are
         'linux-64', 'osx-64', 'win-64' and 'win-32'. Any platform is valid as
         long as the url resolves.
-    blacklist : iterable of tuples
+    blacklist : iterable of tuples, optional
         The values of blacklist should be (key, glob) where key is one of the
         keys in the repodata['packages'] dicts and glob is a thing to match
         on.  Note that all comparisons will be laundered through lowercasing.
-    whitelist : iterable of tuples
+    whitelist : iterable of tuples, optional
         The values of blacklist should be (key, glob) where key is one of the
         keys in the repodata['packages'] dicts and glob is a thing to match
         on.  Note that all comparisons will be laundered through lowercasing.
@@ -489,7 +503,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # Steps:
     # 1. figure out blacklisted packages
     # 2. un-blacklist packages that are actually whitelisted
-    # 3. remove blacklisted packages
+    # 3. Maybe validate local channel
     # 4. figure out final list of packages to mirror
     # 5. mirror new packages to temp dir
     # 6. validate new packages
@@ -504,12 +518,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     info, packages = get_repodata(upstream_channel, platform)
     local_directory = os.path.join(target_directory, platform)
 
-    # 1. validate local repo
-    # validating all packages is taking many hours.
-    # _validate_packages(repodata=repodata,
-    #                    package_directory=local_directory)
-
-    # 2. figure out blacklisted packages
+    # 1. figure out blacklisted packages
     blacklist_packages = {}
     whitelist_packages = {}
     # match blacklist conditions
@@ -521,7 +530,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
             blacklist_packages.update(matched_packages)
         logger.debug(pformat(sorted(blacklist_packages)))
 
-    # 3. un-blacklist packages that are actually whitelisted
+    # 2. un-blacklist packages that are actually whitelisted
     # match whitelist on blacklist
     if whitelist:
         logger.debug("whitelist")
@@ -539,14 +548,12 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     logger.debug('possible_packages_to_mirror')
     logger.debug(pformat(sorted(possible_packages_to_mirror)))
 
-    # 4. remove blacklisted packages
-    # get list of current packages in folder
-    local_packages = _list_conda_packages(local_directory)
-    # if any are not in the final mirror list, remove them
-    for package_name in local_packages:
-        if package_name in true_blacklist:
-            _remove_package(os.path.join(local_directory, package_name),
-                            reason="Package is blacklisted")
+    # 3. Validate all files locally
+    ideal_repodata = {
+        pkg_name: pkg_info for pkg_name, pkg_info in packages.items()
+        if pkg_name in possible_packages_to_mirror}
+    _validate_packages(ideal_repodata, local_directory, update_repodata=True)
+
     # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
     # mirror list
@@ -571,24 +578,24 @@ def main(upstream_channel, target_directory, temp_directory, platform,
             _download(url, download_dir, packages)
 
         # validate all packages in the download directory
-        _validate_packages(packages, download_dir)
+        _validate_packages(packages, download_dir, update_repodata=False)
         logger.debug('contents of %s are %s',
                      download_dir,
                      pformat(os.listdir(download_dir)))
 
-        # 8. Use already downloaded repodata.json contents but prune it of
-        # packages we don't want
-        repodata_path = os.path.join(download_dir, 'repodata.json')
-
+        # 8. Use the repodata we have in ram, but prune it of packages
+        # we don't want
+        info, packages = get_repodata(channel, platform)
         repodata = {'info': info, 'packages': packages}
         # compute the packages that we have locally
-        packages_we_have = set(local_packages +
+        packages_we_have = set(_list_conda_packages(local_directory) +
                                _list_conda_packages(download_dir))
         # remake the packages dictionary with only the packages we have
         # locally
         repodata['packages'] = {
-            name: info for name, info in repodata['packages'].items()
+            pkg_name: packages[pkg_name] for pkg_name in packages_we_have
             if name in packages_we_have}
+
         _write_repodata(download_dir, repodata)
 
         # move new conda packages
@@ -612,6 +619,9 @@ def main(upstream_channel, target_directory, temp_directory, platform,
 
 
 def _write_repodata(package_dir, repodata_dict):
+    td = tempfile.mkdtemp(prefix='conda-mirror')
+    logger.debug("Writing repodata.json and repodata.json.bz2 to temp dir: "
+                 "%s", td)
     data = json.dumps(repodata_dict, indent=2, sort_keys=True)
     # strip trailing whitespace
     data = '\n'.join(line.rstrip() for line in data.splitlines())
@@ -619,15 +629,19 @@ def _write_repodata(package_dir, repodata_dict):
     if not data.endswith('\n'):
         data += '\n'
 
-    with open(os.path.join(package_dir,
-                           'repodata.json'), 'w') as fo:
+    with open(os.path.join(td, 'repodata.json'), 'w') as fo:
         fo.write(data)
 
     # compress repodata.json into the bz2 format. some conda commands still
     # need it
-    bz2_path = os.path.join(package_dir, 'repodata.json.bz2')
+    bz2_path = os.path.join(td, 'repodata.json.bz2')
     with open(bz2_path, 'wb') as fo:
         fo.write(bz2.compress(data.encode('utf-8')))
+
+    for f in ('repodata.json', 'repodata.json.bz2'):
+        logger.debug('Moving %s from tempdir to %s', f, package_dir)
+        shutil.move(os.path.join(td, f),
+                    os.path.join(package_dir, f))
 
 
 if __name__ == "__main__":
