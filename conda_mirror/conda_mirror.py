@@ -587,8 +587,9 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         # remake the packages dictionary with only the packages we have
         # locally
         repodata['packages'] = {
-            name: info for name, info in repodata['packages'].items()
+            pkg_name: packages[pkg_name] for pkg_name in packages_we_have
             if name in packages_we_have}
+
         _write_repodata(download_dir, repodata)
 
         # move new conda packages
