@@ -3,13 +3,52 @@
 [![PyPI version](https://badge.fury.io/py/conda-mirror.svg)](https://badge.fury.io/py/conda-mirror)
 [![codecov](https://codecov.io/gh/maxpoint/conda-mirror/branch/master/graph/badge.svg)](https://codecov.io/gh/maxpoint/conda-mirror)
 
+Mirrors an upstream conda channel to a local directory.
+
+## Install
+
+`pip install conda-mirror`
+
+## CLI
+
+CLI interface for `conda-mirror.py`
+
+```
+$ conda-mirror -h
+usage: conda-mirror [-h] [--upstream-channel UPSTREAM_CHANNEL]
+                    [--target-directory TARGET_DIRECTORY]
+                    [--temp-directory TEMP_DIRECTORY] [--platform PLATFORM]
+                    [-v] [--config CONFIG] [--pdb] [--version]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --upstream-channel UPSTREAM_CHANNEL
+                        The target channel to mirror. Can be a channel on
+                        anaconda.org like "conda-forge" or a full qualified
+                        channel like "https://repo.continuum.io/pkgs/free/"
+  --target-directory TARGET_DIRECTORY
+                        The place where packages should be mirrored to
+  --temp-directory TEMP_DIRECTORY
+                        Temporary download location for the packages. Defaults
+                        to a randomly selected temporary directory. Note that
+                        you might need to specify a different location if your
+                        default temp directory has less available space than
+                        your mirroring target
+  --platform PLATFORM   The OS platform(s) to mirror. one of: {'linux-64',
+                        'linux-32','osx-64', 'win-32', 'win-64'}
+  -v, --verbose         logging defaults to error/exception only. Takes up to
+                        three '-v' flags. '-v': warning. '-vv': info. '-vvv':
+                        debug.
+  --config CONFIG       Path to the yaml config file
+  --pdb                 Enable PDB debugging on exception
+  --version             Print version and quit
+```
 
 ## Example Usage
 
 WARNING: Invoking this command will pull ~10GB and take at least an hour
-```bash
-$ conda-mirror --upstream-channel conda-forge --target-directory local_mirror --platform linux-64
-```
+
+`conda-mirror --upstream-channel conda-forge --target-directory local_mirror --platform linux-64`
 
 ## More Details
 
@@ -34,7 +73,7 @@ upstream repodata.
 whitelist conditions.
 
 blacklist and whitelist both take lists of dictionaries. The keys in the
-dictionary need to be values in the repodata.json metadata. The values are
+dictionary need to be values in the `repodata.json` metadata. The values are
 (unix) globs to match on. Go here for the full repodata of the upstream
 "defaults" channel:
 http://conda.anaconda.org/anaconda/linux-64/repodata.json
@@ -61,7 +100,7 @@ Here are the contents of one of the entries in repodata['packages']
   'version': '1.4.10'}}
 ```
 
-See implementation details in the conda_mirror:match function for more
+See implementation details in the `conda_mirror:match` function for more
 information.
 
 #### Common usage patterns
@@ -90,41 +129,6 @@ blacklist:
     - name: "*"
 whitelist:
     - build: "*py3*"
-```
-
-
-## CLI
-```
-$ conda-mirror -h
-usage: conda-mirror [-h] [--upstream-channel UPSTREAM_CHANNEL]
-                    [--target-directory TARGET_DIRECTORY]
-                    [--temp-directory TEMP_DIRECTORY] [--platform PLATFORM]
-                    [-v] [--config CONFIG] [--pdb] [--version]
-
-CLI interface for conda-mirror.py
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --upstream-channel UPSTREAM_CHANNEL
-                        The target channel to mirror. Can be a channel on
-                        anaconda.org like "conda-forge" or a full qualified
-                        channel like "https://repo.continuum.io/pkgs/free/"
-  --target-directory TARGET_DIRECTORY
-                        The place where packages should be mirrored to
-  --temp-directory TEMP_DIRECTORY
-                        Temporary download location for the packages. Defaults
-                        to a randomly selected temporary directory. Note that
-                        you might need to specify a different location if your
-                        default temp directory has less available space than
-                        your mirroring target
-  --platform PLATFORM   The OS platform(s) to mirror. one of: {'linux-64',
-                        'linux-32','osx-64', 'win-32', 'win-64'}
-  -v, --verbose         logging defaults to error/exception only. Takes up to
-                        three '-v' flags. '-v': warning. '-vv': info. '-vvv':
-                        debug.
-  --config CONFIG       Path to the yaml config file
-  --pdb                 Enable PDB debugging on exception
-  --version             Print version and quit
 ```
 
 ## Testing
