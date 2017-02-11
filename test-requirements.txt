@@ -1,3 +1,4 @@
-pytest
+codecov
 coverage
+pytest
 pytest-ordering
