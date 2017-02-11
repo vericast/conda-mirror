@@ -1,5 +1,6 @@
 # conda-mirror
 [![Build Status](https://travis-ci.org/maxpoint/conda-mirror.svg?branch=master)](https://travis-ci.org/maxpoint/conda-mirror)
+[![PyPI version](https://badge.fury.io/py/conda-mirror.svg)](https://badge.fury.io/py/conda-mirror)
 [![codecov](https://codecov.io/gh/maxpoint/conda-mirror/branch/master/graph/badge.svg)](https://codecov.io/gh/maxpoint/conda-mirror)
 
 
