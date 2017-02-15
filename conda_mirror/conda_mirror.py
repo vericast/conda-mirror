@@ -227,7 +227,7 @@ def cli():
          args.platform, blacklist, whitelist)
 
 
-def _remove_package(pkg_path, reason=None):
+def _remove_package(pkg_path, reason):
     """
     Log and remove a package.
 
@@ -236,18 +236,10 @@ def _remove_package(pkg_path, reason=None):
     pkg_path : str
         Path to a conda package that should be removed
     """
-    if reason is None:
-        reason = "No reason given"
     msg = "Removing: %s. Reason: %s"
     logger.warning(msg, pkg_path, reason)
     os.remove(pkg_path)
 
-
-def _get_output(cmd):
-    ret = delegator.run(cmd).out
-    if ret.err:
-        logger.error(ret.err)
-    return ret.out
 
 
 def _validate(filename, md5=None, sha256=None, size=None):
@@ -317,8 +309,7 @@ def get_repodata(channel, platform):
     return json.get('info', {}), json.get('packages', {})
 
 
-def _download(url, target_directory, package_metadata=None, validate=True,
-              chunk_size=None):
+def _download(url, target_directory):
     """Download `url` to `target_directory`
 
     Parameters
@@ -327,17 +318,8 @@ def _download(url, target_directory, package_metadata=None, validate=True,
         The url to download
     target_directory : str
         The path to a directory where `url` should be downloaded
-    package_metadata : dict, optional
-        package metadata from repodata.json. Will be used for validation of
-        the downloaded package. If None, then validation is skipped
-    validate : bool, optional
-        True: Perform package validation if `package_metadata` is provided.
-        Defaults to True.
-    chunk_size : int, optional
-        The size in Bytes to chunk the download iterator. Defaults to 1024 (1KB)
     """
-    if chunk_size is None:
-        chunk_size = 1024  # 1KB chunks
+    chunk_size = 1024  # 1KB chunks
     logger.info("download_url=%s", url)
     # create a temporary file
     target_filename = url.split('/')[-1]
@@ -347,16 +329,6 @@ def _download(url, target_directory, package_metadata=None, validate=True,
         ret = requests.get(url, stream=True)
         for data in ret.iter_content(chunk_size):
             tf.write(data)
-    # do some validations
-    if validate and package_metadata:
-        _validate(download_filename,
-                  md5=package_metadata.get('md5'),
-                  sha256=package_metadata.get('sha256'),
-                  size=package_metadata.get('size'))
-    else:
-        logger.info("Not validating %s because validate is %s and "
-                     "package_metadata is %s", download_filename, validate,
-                     package_metadata)
 
 
 def _list_conda_packages(local_dir):
@@ -545,8 +517,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     logger.debug('possible_packages_to_mirror')
     logger.debug(pformat(sorted(possible_packages_to_mirror)))
 
-    # 4. remove blacklisted packages
-    _remove_local_blacklisted(true_blacklist, local_directory)
+    # 4. Validate all local packages
+    _validate_packages(possible_packages_to_mirror, local_directory)
 
     # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
@@ -569,7 +541,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                 channel=channel,
                 platform=platform,
                 file_name=package_name)
-            _download(url, download_dir, packages)
+            _download(url, download_dir)
 
         # validate all packages in the download directory
         _validate_packages(packages, download_dir)
