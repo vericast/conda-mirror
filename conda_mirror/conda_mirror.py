@@ -6,7 +6,6 @@ import logging
 import os
 import pdb
 import shutil
-import subprocess
 import sys
 import json
 import tarfile
@@ -17,6 +16,7 @@ from pprint import pformat
 import bz2
 import requests
 import yaml
+import hashlib
 
 logger = None
 
@@ -243,29 +243,11 @@ def _remove_package(pkg_path, reason=None):
     os.remove(pkg_path)
 
 
-def _assert_or_remove(left, right, assertion_test, filename):
-    try:
-        assert left == right
-    except AssertionError:
-        logger.info("Package validation failed for %s: %s != %s",
-                    assertion_test, left, right,
-                    exc_info=True)
-        _remove_package(filename, reason="Failed %s test" % assertion_test)
-        return True
-    else:
-        logger.debug('%s check passed', assertion_test)
-
-
 def _get_output(cmd):
-    try:
-        return subprocess.check_output(cmd).decode().strip().split()[0]
-    except subprocess.CalledProcessError as cpe:
-        logger.exception(cpe.output.decode())
-        return ""
-    except Exception:
-        msg = "Error in subprocess.check_output. cmd: '%s'"
-        logger.exception(msg, ' '.join(cmd))
-        return ""
+    ret = delegator.run(cmd).out
+    if ret.err:
+        logger.error(ret.err)
+    return ret.out
 
 
 def _validate(filename, md5=None, sha256=None, size=None):
@@ -291,20 +273,25 @@ def _validate(filename, md5=None, sha256=None, size=None):
         t = tarfile.open(filename)
         t.extractfile('info/index.json').read().decode('utf-8')
     except tarfile.TarError:
-        logger.debug("tarfile error encountered. Original error below.")
-        logger.debug(pformat(traceback.format_exc()))
+        logger.info("Validation failed because conda package is corrupted.",
+                    exc_info=True)
         _remove_package(filename, reason="Tarfile read failure")
         return
-    checks = [
-        (size, lambda: os.stat(filename).st_size, 'size'),
-        (md5, lambda: _get_output(['md5sum', filename]), 'md5'),
-        (sha256, lambda: _get_output(['sha256sum', filename]), 'sha256'),
-    ]
-    for target, validate_function, description in checks:
-        if target is not None:
-            if _assert_or_remove(target, validate_function(), description,
-                                 filename):
-                return
+    if size:
+        if os.stat(filename).st_size != size:
+            _remove_package(filename, reason="Failed size test")
+    if md5:
+        calc = hashlib.md5(open(filename, 'rb').read()).hexdigest()
+        if calc != md5:
+            _remove_package(
+                filename,
+                reason="Failed md5 validation. Expected: %s. Computed: %s" % (calc, md5))
+    if sha256:
+        calc = hashlib.sha256(open(filename, 'rb').read()).hexdigest()
+        if calc != md5:
+            _remove_package(
+                filename,
+                reason="Failed sha256 validation. Expected: %s. Computed: %s" % (calc, sha256))
 
 
 def get_repodata(channel, platform):
@@ -428,7 +415,7 @@ def _validate_packages(package_repodata, package_directory):
 
 
 def _remove_local_blacklisted(blacklist, local_dir):
-    """Removes any local conda packages that are blacklisted. 
+    """Removes any local conda packages that are blacklisted.
 
     Parameters
     ----------
@@ -443,7 +430,7 @@ def _remove_local_blacklisted(blacklist, local_dir):
     for package_name in local_packages:
         if package_name in blacklist:
             _remove_package(os.path.join(local_dir, package_name),
-                            reason="Package is blacklisted")    
+                            reason="Package is blacklisted")
 
 
 def main(upstream_channel, target_directory, temp_directory, platform,
