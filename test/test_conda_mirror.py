@@ -31,6 +31,13 @@ def test_match(repodata):
     assert len(matched) == len(repodata_packages)
 
 
+def test_version():
+    old_args = copy.copy(sys.argv)
+    sys.argv = ['conda-mirror', '--version']
+    conda_mirror.cli()
+    sys.argv = old_args
+
+
 @pytest.mark.parametrize(
     'channel,platform',
     itertools.product([anaconda_channel, 'conda-forge'], ['linux-64']))
@@ -132,3 +139,5 @@ def test_local_blacklisted_package(tmpdir):
     conda_mirror._remove_local_blacklisted(blacklist, pkg_root)
     assert blacklisted_pkg_name not in os.listdir(pkg_root)
     assert non_blacklisted_pkg_name in os.listdir(pkg_root)
+
+
