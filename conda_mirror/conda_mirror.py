@@ -22,7 +22,11 @@ logger = None
 
 DEFAULT_BAD_LICENSES = ['agpl', '']
 
-DEFAULT_PLATFORMS = ['linux-64', 'linux-32', 'osx-64', 'win-64', 'win-32']
+DEFAULT_PLATFORMS = ['linux-64',
+                     'linux-32',
+                     'osx-64',
+                     'win-64',
+                     'win-32']
 
 
 def _maybe_split_channel(channel):
@@ -59,8 +63,7 @@ def _maybe_split_channel(channel):
     # looks like we are being given a fully qualified channel
     download_base, channel = channel.rsplit('/', 1)
     download_template = download_base + url_suffix
-    logger.debug('download_template=%s. channel=%s', download_template,
-                 channel)
+    logger.debug('download_template=%s. channel=%s', download_template, channel)
     return download_template, channel
 
 
@@ -81,10 +84,9 @@ def _match(all_packages, key_glob_dict):
         (key, glob_value) tuples
     """
     matched = dict()
-    key_glob_dict = {
-        key.lower(): glob.lower()
-        for key, glob in key_glob_dict.items()
-    }
+    key_glob_dict = {key.lower(): glob.lower()
+                     for key, glob
+                     in key_glob_dict.items()}
     for pkg_name, pkg_info in all_packages.items():
         matched_all = []
         # normalize the strings so that comparisons are easier
@@ -109,50 +111,55 @@ def _make_arg_parser():
     argument_parser : argparse.ArgumentParser
         The instantiated argument parser for this CLI
     """
-    ap = argparse.ArgumentParser(
-        description="CLI interface for conda-mirror.py")
+    ap = argparse.ArgumentParser(description="CLI interface for conda-mirror.py")
 
     ap.add_argument(
         '--upstream-channel',
         help=('The target channel to mirror. Can be a channel on anaconda.org '
               'like "conda-forge" or a full qualified channel like '
-              '"https://repo.continuum.io/pkgs/free/"'), )
+              '"https://repo.continuum.io/pkgs/free/"'),
+    )
     ap.add_argument(
         '--target-directory',
-        help='The place where packages should be mirrored to', )
+        help='The place where packages should be mirrored to',
+    )
     ap.add_argument(
         '--temp-directory',
-        help=(
-            'Temporary download location for the packages. Defaults to a '
-            'randomly selected temporary directory. Note that you might need '
-            'to specify a different location if your default temp directory '
-            'has less available space than your mirroring target'),
-        default=tempfile.gettempdir())
+        help=('Temporary download location for the packages. Defaults to a '
+              'randomly selected temporary directory. Note that you might need '
+              'to specify a different location if your default temp directory '
+              'has less available space than your mirroring target'),
+        default=tempfile.gettempdir()
+    )
     ap.add_argument(
         '--platform',
         help=("The OS platform(s) to mirror. one of: {'linux-64', 'linux-32',"
-              "'osx-64', 'win-32', 'win-64'}"), )
+              "'osx-64', 'win-32', 'win-64'}"),
+    )
     ap.add_argument(
-        '-v',
-        '--verbose',
+        '-v', '--verbose',
         action="count",
         help=("logging defaults to error/exception only. Takes up to three "
               "'-v' flags. '-v': warning. '-vv': info. '-vvv': debug."),
-        default=0, )
+        default=0,
+    )
     ap.add_argument(
         '--config',
         action="store",
-        help="Path to the yaml config file", )
+        help="Path to the yaml config file",
+    )
     ap.add_argument(
         '--pdb',
         action="store_true",
         help="Enable PDB debugging on exception",
-        default=False, )
+        default=False,
+    )
     ap.add_argument(
         '--version',
         action="store_true",
         help="Print version and quit",
-        default=False, )
+        default=False,
+    )
     return ap
 
 
@@ -160,12 +167,10 @@ def _init_logger(verbosity):
     # set up the logger
     global logger
     logger = logging.getLogger('conda_mirror')
-    logmap = {
-        0: logging.ERROR,
-        1: logging.WARNING,
-        2: logging.INFO,
-        3: logging.DEBUG
-    }
+    logmap = {0: logging.ERROR,
+              1: logging.WARNING,
+              2: logging.INFO,
+              3: logging.DEBUG}
     loglevel = logmap.get(verbosity, '3')
 
     # clear all handlers
@@ -180,9 +185,8 @@ def _init_logger(verbosity):
 
     logger.addHandler(stream_handler)
 
-    print(
-        "Log level set to %s" % logging.getLevelName(logmap[verbosity]),
-        file=sys.stdout)
+    print("Log level set to %s" % logging.getLevelName(logmap[verbosity]),
+          file=sys.stdout)
 
 
 def cli():
@@ -208,7 +212,6 @@ def cli():
         # set the pdb_hook as the except hook for all exceptions
         def pdb_hook(exctype, value, traceback):
             pdb.post_mortem(traceback)
-
         sys.excepthook = pdb_hook
 
     config_dict = {}
@@ -238,6 +241,7 @@ def _remove_package(pkg_path, reason):
     os.remove(pkg_path)
 
 
+
 def _validate(filename, md5=None, sha256=None, size=None):
     """Validate the conda package tarfile located at `filename` with any of the
     passed in options `md5`, `sha256` or `size. Also implicitly validate that
@@ -261,9 +265,8 @@ def _validate(filename, md5=None, sha256=None, size=None):
         t = tarfile.open(filename)
         t.extractfile('info/index.json').read().decode('utf-8')
     except tarfile.TarError:
-        logger.info(
-            "Validation failed because conda package is corrupted.",
-            exc_info=True)
+        logger.info("Validation failed because conda package is corrupted.",
+                    exc_info=True)
         _remove_package(filename, reason="Tarfile read failure")
         return
     if size:
@@ -274,15 +277,13 @@ def _validate(filename, md5=None, sha256=None, size=None):
         if calc != md5:
             _remove_package(
                 filename,
-                reason="Failed md5 validation. Expected: %s. Computed: %s" %
-                (calc, md5))
+                reason="Failed md5 validation. Expected: %s. Computed: %s" % (calc, md5))
     if sha256:
         calc = hashlib.sha256(open(filename, 'rb').read()).hexdigest()
         if calc != md5:
             _remove_package(
                 filename,
-                reason="Failed sha256 validation. Expected: %s. Computed: %s" %
-                (calc, sha256))
+                reason="Failed sha256 validation. Expected: %s. Computed: %s" % (calc, sha256))
 
 
 def get_repodata(channel, platform):
@@ -302,8 +303,8 @@ def get_repodata(channel, platform):
         keyed on package name (e.g., twisted-16.0.0-py35_0.tar.bz2)
     """
     url_template, channel = _maybe_split_channel(channel)
-    url = url_template.format(
-        channel=channel, platform=platform, file_name='repodata.json')
+    url = url_template.format(channel=channel, platform=platform,
+                              file_name='repodata.json')
     json = requests.get(url).json()
     return json.get('info', {}), json.get('packages', {})
 
@@ -372,27 +373,40 @@ def _validate_packages(package_repodata, package_directory):
         except KeyError:
             logger.warning("%s is not in the upstream index. Removing...",
                            package)
-            _remove_package(
-                os.path.join(package_directory, package),
-                reason="Package is not in the repodata index")
+            _remove_package(os.path.join(package_directory, package),
+                            reason="Package is not in the repodata index")
         else:
             # validate the integrity of the package, the size of the package and
             # its hashes
             logger.info('Validating %s. %s of %s', package, idx,
                         len(local_packages))
-            _validate(
-                os.path.join(package_directory, package),
-                md5=package_metadata.get('md5'),
-                sha256=package_metadata.get('sha256'),
-                size=package_metadata.get('size'))
+            _validate(os.path.join(package_directory, package),
+                      md5=package_metadata.get('md5'),
+                      sha256=package_metadata.get('sha256'),
+                      size=package_metadata.get('size'))
 
 
-def main(upstream_channel,
-         target_directory,
-         temp_directory,
-         platform,
-         blacklist=None,
-         whitelist=None):
+def _remove_local_blacklisted(blacklist, local_dir):
+    """Removes any local conda packages that are blacklisted.
+
+    Parameters
+    ----------
+    blacklist : list
+        Packages that should not be in `local_dir`
+    local_dir : str
+        Local directory to check for blacklisted conda packages
+    """
+    # get list of current packages in folder
+    local_packages = _list_conda_packages(local_dir)
+    # if any are not in the final mirror list, remove them
+    for package_name in local_packages:
+        if package_name in blacklist:
+            _remove_package(os.path.join(local_dir, package_name),
+                            reason="Package is blacklisted")
+
+
+def main(upstream_channel, target_directory, temp_directory, platform,
+         blacklist=None, whitelist=None):
     """
 
     Parameters
@@ -524,12 +538,15 @@ def main(upstream_channel,
         logger.info('downloading to the tempdir %s', download_dir)
         for package_name in sorted(to_mirror):
             url = download_url.format(
-                channel=channel, platform=platform, file_name=package_name)
+                channel=channel,
+                platform=platform,
+                file_name=package_name)
             _download(url, download_dir)
 
         # validate all packages in the download directory
         _validate_packages(packages, download_dir)
-        logger.debug('contents of %s are %s', download_dir,
+        logger.debug('contents of %s are %s',
+                     download_dir,
                      pformat(os.listdir(download_dir)))
 
         # 8. Use already downloaded repodata.json contents but prune it of
@@ -538,15 +555,13 @@ def main(upstream_channel,
 
         repodata = {'info': info, 'packages': packages}
         # compute the packages that we have locally
-        packages_we_have = set(local_packages + _list_conda_packages(
-            download_dir))
+        packages_we_have = set(local_packages +
+                               _list_conda_packages(download_dir))
         # remake the packages dictionary with only the packages we have
         # locally
         repodata['packages'] = {
-            name: info
-            for name, info in repodata['packages'].items()
-            if name in packages_we_have
-        }
+            name: info for name, info in repodata['packages'].items()
+            if name in packages_we_have}
         _write_repodata(download_dir, repodata)
 
         # move new conda packages
@@ -577,7 +592,8 @@ def _write_repodata(package_dir, repodata_dict):
     if not data.endswith('\n'):
         data += '\n'
 
-    with open(os.path.join(package_dir, 'repodata.json'), 'w') as fo:
+    with open(os.path.join(package_dir,
+                           'repodata.json'), 'w') as fo:
         fo.write(data)
 
     # compress repodata.json into the bz2 format. some conda commands still
