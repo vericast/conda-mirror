@@ -242,9 +242,9 @@ def _remove_package(pkg_path, reason):
 
 
 
-def _validate(filename, md5=None, sha256=None, size=None):
+def _validate(filename, md5=None, size=None):
     """Validate the conda package tarfile located at `filename` with any of the
-    passed in options `md5`, `sha256` or `size. Also implicitly validate that
+    passed in options `md5` or `size. Also implicitly validate that
     the conda package is a valid tarfile.
 
     NOTE: Removes packages that fail validation
@@ -255,8 +255,6 @@ def _validate(filename, md5=None, sha256=None, size=None):
         The path to the file you wish to validate
     md5 : str, optional
         If provided, perform an `md5sum` on `filename` and compare to `md5`
-    sha256 : str, optional
-        If provided, perform a `sha256sum` on `filename` and compare to `sha256`
     size : int, optional
         if provided, stat the file at `filename` and make sure its size
         matches `size`
@@ -278,12 +276,6 @@ def _validate(filename, md5=None, sha256=None, size=None):
             _remove_package(
                 filename,
                 reason="Failed md5 validation. Expected: %s. Computed: %s" % (calc, md5))
-    if sha256:
-        calc = hashlib.sha256(open(filename, 'rb').read()).hexdigest()
-        if calc != md5:
-            _remove_package(
-                filename,
-                reason="Failed sha256 validation. Expected: %s. Computed: %s" % (calc, sha256))
 
 
 def get_repodata(channel, platform):
@@ -382,7 +374,6 @@ def _validate_packages(package_repodata, package_directory):
                         len(local_packages))
             _validate(os.path.join(package_directory, package),
                       md5=package_metadata.get('md5'),
-                      sha256=package_metadata.get('sha256'),
                       size=package_metadata.get('size'))
 
 
