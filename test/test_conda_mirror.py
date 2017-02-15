@@ -120,24 +120,3 @@ def test_handling_bad_package(tmpdir, repodata):
     conda_mirror._validate_packages(anaconda_repodata, bad_pkg_root)
     assert bad_pkg_name not in os.listdir(bad_pkg_root)
 
-
-def test_local_blacklisted_package(tmpdir):
-    local_repo_root = tmpdir.mkdir('repo').strpath
-    pkg_root = os.path.join(local_repo_root, 'linux-64')
-    os.makedirs(pkg_root)
-    blacklisted_pkg_name = 'remove-1-0.tar.bz2'
-    non_blacklisted_pkg_name = 'keep-1-0.tar.bz2'
-    with bz2.BZ2File(os.path.join(pkg_root, blacklisted_pkg_name), 'wb') as f:
-        f.write("This is a blacklisted package".encode())
-    with bz2.BZ2File(os.path.join(pkg_root, non_blacklisted_pkg_name), 'wb') as f:
-        f.write("This is not a blacklisted package".encode())
-    blacklist = [blacklisted_pkg_name]
-
-    # Test removal of local blacklisted packages
-    conda_mirror.logger.info("Testing %s", blacklisted_pkg_name)
-    assert blacklisted_pkg_name in os.listdir(pkg_root)
-    conda_mirror._remove_local_blacklisted(blacklist, pkg_root)
-    assert blacklisted_pkg_name not in os.listdir(pkg_root)
-    assert non_blacklisted_pkg_name in os.listdir(pkg_root)
-
-

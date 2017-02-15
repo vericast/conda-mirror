@@ -386,25 +386,6 @@ def _validate_packages(package_repodata, package_directory):
                       size=package_metadata.get('size'))
 
 
-def _remove_local_blacklisted(blacklist, local_dir):
-    """Removes any local conda packages that are blacklisted.
-
-    Parameters
-    ----------
-    blacklist : list
-        Packages that should not be in `local_dir`
-    local_dir : str
-        Local directory to check for blacklisted conda packages
-    """
-    # get list of current packages in folder
-    local_packages = _list_conda_packages(local_dir)
-    # if any are not in the final mirror list, remove them
-    for package_name in local_packages:
-        if package_name in blacklist:
-            _remove_package(os.path.join(local_dir, package_name),
-                            reason="Package is blacklisted")
-
-
 def main(upstream_channel, target_directory, temp_directory, platform,
          blacklist=None, whitelist=None):
     """
