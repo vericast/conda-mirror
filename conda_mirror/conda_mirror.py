@@ -490,7 +490,9 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     logger.debug(pformat(sorted(possible_packages_to_mirror)))
 
     # 4. Validate all local packages
-    _validate_packages(possible_packages_to_mirror, local_directory)
+    # construct the desired package repodata
+    desired_repodata = {pkgname: packages[pkgname] for pkgname in possible_packages_to_mirror}
+    _validate_packages(desired_repodata, local_directory)
 
     # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
