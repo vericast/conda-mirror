@@ -71,6 +71,10 @@ whitelist:
                          platform=platform)
     old_argv = copy.deepcopy(sys.argv)
     sys.argv = cli_args.split(' ')
+    # write a bad package into the mirror directory to make sure we exercise a broken
+    # code path
+    # https://github.com/maxpoint/conda-mirror/issues/29
+    _write_bad_package(f2.strpath, platform)
     conda_mirror.cli()
     sys.argv = old_argv
 
@@ -93,30 +97,11 @@ whitelist:
         assert len(rd['info']) == len(disk_info)
         assert len(rd['packages']) == len(disk_packages)
 
-
-def test_handling_bad_package(tmpdir, repodata):
-    # ensure that bad conda packages are actually removed by run_conda_index
-    local_repo_root = tmpdir.mkdir('repo').strpath
-    bad_pkg_root = os.path.join(local_repo_root, 'linux-64')
-    os.makedirs(bad_pkg_root)
+def _write_bad_package(channel_dir, platform_name):
+    target_dir = os.path.join(channel_dir, platform_name)
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir)
     bad_pkg_name = 'bad-1-0.tar.bz2'
-
-    # Test removal functionality of packages that are not in the upstream
-    # repodata.json
-    conda_mirror.logger.info("Testing %s", bad_pkg_name)
-    with bz2.BZ2File(os.path.join(bad_pkg_root, bad_pkg_name), 'wb') as f:
+    with bz2.BZ2File(os.path.join(target_dir, bad_pkg_name), 'wb') as f:
         f.write("This is a fake package".encode())
-    assert bad_pkg_name in os.listdir(bad_pkg_root)
-    conda_mirror._validate_packages(repodata, bad_pkg_root)
-    assert bad_pkg_name not in os.listdir(bad_pkg_root)
-
-    # Test removal of broken packages that do exist in upstream repodata.json
-    anaconda_repodata = repodata[anaconda_channel][1]
-    bad_pkg_name = next(iter(anaconda_repodata.keys()))
-    conda_mirror.logger.info("Testing %s", bad_pkg_name)
-    with bz2.BZ2File(os.path.join(bad_pkg_root, bad_pkg_name), 'wb') as f:
-        f.write("This is a fake package".encode())
-    assert bad_pkg_name in os.listdir(bad_pkg_root)
-    conda_mirror._validate_packages(anaconda_repodata, bad_pkg_root)
-    assert bad_pkg_name not in os.listdir(bad_pkg_root)
 
