@@ -71,12 +71,12 @@ whitelist:
                          platform=platform)
     old_argv = copy.deepcopy(sys.argv)
     sys.argv = cli_args.split(' ')
-    # Write a package that does not exist in the upstreap repodata into the mirror path
+    # Write a package that does not exist in the upstream repodata into the mirror path
     # to make sure we exercise a broken code path
     # https://github.com/maxpoint/conda-mirror/issues/29
     _write_bad_package(channel_dir=f2.strpath, platform_name=platform,
                        pkg_name='bad-1-0.tar.bz2')
-    # Write a bad package that does exist in the upstreap repodata into the mirror path
+    # Write a bad package that does exist in the upstream repodata into the mirror path
     # to make sure we can handle that case too
     upstream_pkg_name = next(iter(repodata.keys()))
     _write_bad_package(channel_dir=f2.strpath, platform_name=platform,
