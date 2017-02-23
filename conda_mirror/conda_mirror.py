@@ -270,12 +270,14 @@ def _validate(filename, md5=None, size=None):
     if size:
         if os.stat(filename).st_size != size:
             _remove_package(filename, reason="Failed size test")
+            return
     if md5:
         calc = hashlib.md5(open(filename, 'rb').read()).hexdigest()
         if calc != md5:
             _remove_package(
                 filename,
                 reason="Failed md5 validation. Expected: %s. Computed: %s" % (calc, md5))
+            return
 
 
 def get_repodata(channel, platform):
