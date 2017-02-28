@@ -9,7 +9,7 @@ setup(
     packages=find_packages(),
     author_email='eric.dill@maxpoint.com',
     description='mirror an upstream conda channel to a local directory',
-    url='https://github.com/ericdill/conda-mirror',
+    url='https://github.com/maxpoint/conda-mirror',
     platforms='Cross platform (Linux, Mac OSX, Windows)',
     license='BSD 3-Clause',
     install_requires=[
