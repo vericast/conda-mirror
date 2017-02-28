@@ -1,5 +1,6 @@
 include CHANGELOG.md
 include LICENSE
+include README.md
 
 include versioneer.py
 include conda_mirror/_version.py
