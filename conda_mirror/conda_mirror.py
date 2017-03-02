@@ -359,7 +359,7 @@ def _validate_packages(package_repodata, package_directory):
     """
     # validate local conda packages
     local_packages = _list_conda_packages(package_directory)
-    for idx, package in enumerate(local_packages):
+    for idx, package in enumerate(sorted(local_packages)):
         # ensure the packages in this directory are in the upstream
         # repodata.json
         try:
