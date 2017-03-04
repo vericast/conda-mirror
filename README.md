@@ -79,7 +79,8 @@ dictionary need to be values in the `repodata.json` metadata. The values are
 http://conda.anaconda.org/anaconda/linux-64/repodata.json
 
 Here are the contents of one of the entries in repodata['packages']
-```
+
+```python
 {'botocore-1.4.10-py34_0.tar.bz2': {'arch': 'x86_64',
   'binstar': {'channel': 'main',
    'owner_id': '55fc8527d3234d09d4951c71',
