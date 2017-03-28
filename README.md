@@ -7,7 +7,19 @@ Mirrors an upstream conda channel to a local directory.
 
 ## Install
 
+`conda-mirror` is available on PyPI and conda-forge.
+
+Install with:
+
 `pip install conda-mirror`
+
+or:
+
+`conda install conda-mirror -c conda-forge`
+
+## Compatibility
+
+`conda-mirror` is intentionally a py3 only package
 
 ## CLI
 
