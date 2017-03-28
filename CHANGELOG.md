@@ -1,12 +1,63 @@
 # Change Log
 
-## [0.6.2](https://github.com/maxpoint/conda-mirror/tree/0.6.2) (2017-02-07)
+## [Unreleased](https://github.com/maxpoint/conda-mirror/tree/HEAD)
 
-[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.6.1...HEAD)
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.6.5...HEAD)
+
+**Implemented enhancements:**
+
+- Sort packages for validation [\#34](https://github.com/maxpoint/conda-mirror/issues/34)
+
+**Closed issues:**
+
+- Does not run under py 2.7 [\#42](https://github.com/maxpoint/conda-mirror/issues/42)
+- Package license [\#36](https://github.com/maxpoint/conda-mirror/issues/36)
+- setup.py home [\#35](https://github.com/maxpoint/conda-mirror/issues/35)
+
+**Merged pull requests:**
+
+- MNT/DOC: Make it clear this is py3 only [\#44](https://github.com/maxpoint/conda-mirror/pull/44) ([ericdill](https://github.com/ericdill))
+- Add syntax highlight to the repodata example in README [\#41](https://github.com/maxpoint/conda-mirror/pull/41) ([nicoddemus](https://github.com/nicoddemus))
+- Sort the validation output [\#40](https://github.com/maxpoint/conda-mirror/pull/40) ([ericdill](https://github.com/ericdill))
+- Fix home to point to MaxPoint org [\#38](https://github.com/maxpoint/conda-mirror/pull/38) ([jakirkham](https://github.com/jakirkham))
+- Package standard docs [\#37](https://github.com/maxpoint/conda-mirror/pull/37) ([jakirkham](https://github.com/jakirkham))
+
+## [0.6.5](https://github.com/maxpoint/conda-mirror/tree/0.6.5) (2017-02-23)
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.6.4...0.6.5)
+
+**Closed issues:**
+
+- FileNotFoundError after package is removed for failing size validation [\#31](https://github.com/maxpoint/conda-mirror/issues/31)
+
+**Merged pull requests:**
+
+- Return after removing the package [\#32](https://github.com/maxpoint/conda-mirror/pull/32) ([ericdill](https://github.com/ericdill))
+
+## [0.6.4](https://github.com/maxpoint/conda-mirror/tree/0.6.4) (2017-02-23)
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.6.3...0.6.4)
+
+**Closed issues:**
+
+- TypeError: 'set' object is not subscriptable [\#29](https://github.com/maxpoint/conda-mirror/issues/29)
+
+**Merged pull requests:**
+
+- Fix Type Error [\#30](https://github.com/maxpoint/conda-mirror/pull/30) ([ericdill](https://github.com/ericdill))
+
+## [0.6.3](https://github.com/maxpoint/conda-mirror/tree/0.6.3) (2017-02-15)
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.6.2...0.6.3)
 
 **Closed issues:**
 
 - Mirror pro repo [\#24](https://github.com/maxpoint/conda-mirror/issues/24)
+
+**Merged pull requests:**
+
+- Validate local repo every time you run conda-mirror [\#28](https://github.com/maxpoint/conda-mirror/pull/28) ([ericdill](https://github.com/ericdill))
+- Updates to README, Travis, test coverage [\#27](https://github.com/maxpoint/conda-mirror/pull/27) ([opiethehokie](https://github.com/opiethehokie))
+
+## [0.6.2](https://github.com/maxpoint/conda-mirror/tree/0.6.2) (2017-02-07)
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.6.1...0.6.2)
 
 **Merged pull requests:**
 
