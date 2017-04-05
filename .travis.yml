@@ -12,6 +12,7 @@ install:
 
 script:
 - conda-mirror -h
+- export CONDA_MIRROR_NUM_THREADS=2
 - coverage run run_tests.py
 - coverage report -m
 
