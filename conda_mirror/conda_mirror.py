@@ -362,19 +362,21 @@ def _validate_packages(package_repodata, package_directory):
     # is set.  Use serial map otherwise.
     num_threads = _read_num_threads_from_env()
 
+    # create argument list (necessary because multiprocessing.Pool.map does not
+    # accept additional args to be passed to the mapped function)
+    val_func_arg_list = [(package, package_repodata, package_repodata) for
+                         package in sorted(local_packages)]
+
     if num_threads is not None:
         logger.info('Will use {} threads for package validation.'
                     ''.format(num_threads))
         p = multiprocessing.Pool(num_threads)
-        def _val_packages_loop_with_args(package):
-            return _validate_packages_loop(package, package_repodata, package_directory)
-        p.map(_val_packages_loop_with_args, sorted(local_packages))
+        p.map(_validate_packages_loop, val_func_arg_list)
         p.close()
         p.terminate()
         p.join()
     else:
-        map(_validate_packages_loop, sorted(local_packages), package_repodata,
-            package_directory)
+        map(_validate_packages_loop, val_func_arg_list)
 
 
 def _validate_packages_loop(package, package_repodata, package_directory):
