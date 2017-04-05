@@ -379,7 +379,12 @@ def _validate_packages(package_repodata, package_directory):
         map(_validate_packages_loop, val_func_arg_list)
 
 
-def _validate_packages_loop(package, package_repodata, package_directory):
+def _validate_packages_loop(arg_tuple):
+
+    # unpack arg tuple tuple
+    package = arg_tuple[0]
+    package_repodata = arg_tuple[1]
+    package_directory = arg_tuple[2]
 
     # ensure the packages in this directory are in the upstream
     # repodata.json
