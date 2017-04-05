@@ -364,7 +364,7 @@ def _validate_packages(package_repodata, package_directory):
 
     # create argument list (necessary because multiprocessing.Pool.map does not
     # accept additional args to be passed to the mapped function)
-    val_func_arg_list = [(package, package_repodata, package_repodata) for
+    val_func_arg_list = [(package, package_repodata, package_directory) for
                          package in sorted(local_packages)]
 
     if num_threads is not None:
