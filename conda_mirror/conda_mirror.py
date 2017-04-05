@@ -356,24 +356,27 @@ def _validate_packages(package_repodata, package_directory):
     """
     # validate local conda packages
     local_packages = _list_conda_packages(package_directory)
-    for idx, package in enumerate(sorted(local_packages)):
-        # ensure the packages in this directory are in the upstream
-        # repodata.json
-        try:
-            package_metadata = package_repodata[package]
-        except KeyError:
-            logger.warning("%s is not in the upstream index. Removing...",
-                           package)
-            _remove_package(os.path.join(package_directory, package),
-                            reason="Package is not in the repodata index")
-        else:
-            # validate the integrity of the package, the size of the package and
-            # its hashes
-            logger.info('Validating %s. %s of %s', package, idx,
-                        len(local_packages))
-            _validate(os.path.join(package_directory, package),
-                      md5=package_metadata.get('md5'),
-                      size=package_metadata.get('size'))
+
+    map(_validate_packages_loop, sorted(local_packages))
+
+def _validate_packages_loop(package):
+
+    # ensure the packages in this directory are in the upstream
+    # repodata.json
+    try:
+        package_metadata = package_repodata[package]
+    except KeyError:
+        logger.warning("%s is not in the upstream index. Removing...",
+                       package)
+        _remove_package(os.path.join(package_directory, package),
+                        reason="Package is not in the repodata index")
+    else:
+        # validate the integrity of the package, the size of the package and
+        # its hashes
+        logger.info('Validating {}.'.format(package))
+        _validate(os.path.join(package_directory, package),
+                  md5=package_metadata.get('md5'),
+                  size=package_metadata.get('size'))
 
 
 def _read_num_threads_from_env():
