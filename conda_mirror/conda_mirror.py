@@ -14,6 +14,7 @@ import bz2
 import requests
 import yaml
 import hashlib
+import multiprocessing
 
 logger = None
 
