@@ -14,6 +14,7 @@ import bz2
 import requests
 import yaml
 import hashlib
+import multiprocessing
 
 logger = None
 
@@ -27,8 +28,9 @@ DEFAULT_PLATFORMS = ['linux-64',
 
 
 def _maybe_split_channel(channel):
-    """Split channel if it is fully qualified. Otherwise default to
-    conda.anaconda.org
+    """Split channel if it is fully qualified.
+
+    Otherwise default to conda.anaconda.org
 
     Parameters
     ----------
@@ -39,13 +41,15 @@ def _maybe_split_channel(channel):
     Returns
     -------
     download_template : str
-        defaults to "https://conda.anaconda.org/{channel}/{platform}/{file_name}"
+        defaults to
+        "https://conda.anaconda.org/{channel}/{platform}/{file_name}"
         The base url will be modified if the `channel` input parameter is
         fully qualified
     channel : str
         The name-only channel. If the channel input param is something like
         "conda-forge", then "conda-forge" will be returned. If the channel
         input param is something like "https://repo.continuum.io/pkgs/free/"
+
     """
     # strip trailing slashes
     channel = channel.strip('/')
@@ -60,7 +64,8 @@ def _maybe_split_channel(channel):
     # looks like we are being given a fully qualified channel
     download_base, channel = channel.rsplit('/', 1)
     download_template = download_base + url_suffix
-    logger.debug('download_template=%s. channel=%s', download_template, channel)
+    logger.debug('download_template=%s. channel=%s',
+                 download_template, channel)
     return download_template, channel
 
 
@@ -79,6 +84,7 @@ def _match(all_packages, key_glob_dict):
     matched : dict
         Iterable of package metadata dicts which match the `target_packages`
         (key, glob_value) tuples
+
     """
     matched = dict()
     key_glob_dict = {key.lower(): glob.lower()
@@ -108,7 +114,8 @@ def _make_arg_parser():
     argument_parser : argparse.ArgumentParser
         The instantiated argument parser for this CLI
     """
-    ap = argparse.ArgumentParser(description="CLI interface for conda-mirror.py")
+    ap = argparse.ArgumentParser(
+        description="CLI interface for conda-mirror.py")
 
     ap.add_argument(
         '--upstream-channel',
@@ -122,10 +129,11 @@ def _make_arg_parser():
     )
     ap.add_argument(
         '--temp-directory',
-        help=('Temporary download location for the packages. Defaults to a '
-              'randomly selected temporary directory. Note that you might need '
-              'to specify a different location if your default temp directory '
-              'has less available space than your mirroring target'),
+        help=(
+            'Temporary download location for the packages. Defaults to a '
+            'randomly selected temporary directory. Note that you might need '
+            'to specify a different location if your default temp directory '
+            'has less available space than your mirroring target'),
         default=tempfile.gettempdir()
     )
     ap.add_argument(
@@ -151,6 +159,13 @@ def _make_arg_parser():
         help="Enable PDB debugging on exception",
         default=False,
     )
+    ap.add_argument(
+        '--num-threads',
+        action="store",
+        default=1,
+        type=int,
+        help="Num of threads for validation. 1: Serial mode. 0: All available."
+        )
     ap.add_argument(
         '--version',
         action="store_true",
@@ -221,7 +236,7 @@ def cli():
     whitelist = config_dict.get('whitelist')
 
     main(args.upstream_channel, args.target_directory, args.temp_directory,
-         args.platform, blacklist, whitelist)
+         args.platform, blacklist, whitelist, args.num_threads)
 
 
 def _remove_package(pkg_path, reason):
@@ -236,7 +251,6 @@ def _remove_package(pkg_path, reason):
     msg = "Removing: %s. Reason: %s"
     logger.warning(msg, pkg_path, reason)
     os.remove(pkg_path)
-
 
 
 def _validate(filename, md5=None, size=None):
@@ -273,7 +287,8 @@ def _validate(filename, md5=None, size=None):
         if calc != md5:
             _remove_package(
                 filename,
-                reason="Failed md5 validation. Expected: %s. Computed: %s" % (calc, md5))
+                reason="Failed md5 validation. Expected: %s. Computed: %s"
+                % (calc, md5))
             return
 
 
@@ -339,13 +354,14 @@ def _list_conda_packages(local_dir):
     return fnmatch.filter(contents, "*.tar.bz2")
 
 
-def _validate_packages(package_repodata, package_directory):
+def _validate_packages(package_repodata, package_directory, num_threads=1):
     """Validate local conda packages.
 
-    NOTE: This is slow.
-    NOTE2: This will remove any packages that are in `package_directory` that
+    NOTE1: This will remove any packages that are in `package_directory` that
            are not in `repodata` and also any packages that fail the package
            validation
+    NOTE2: In concurrent mode (num_threads is not 1) this might be hard to kill
+           using CTRL-C.
 
     Parameters
     ----------
@@ -353,31 +369,76 @@ def _validate_packages(package_repodata, package_directory):
         The contents of repodata.json
     package_directory : str
         Path to the local repo that contains conda packages
+    num_threads : int
+        Number of concurrent processes to use. Set to `0` to use a number of
+        processes equal to the number of cores in the system. Defaults to `1`
+        (i.e. serial package validation).
     """
     # validate local conda packages
     local_packages = _list_conda_packages(package_directory)
-    for idx, package in enumerate(sorted(local_packages)):
-        # ensure the packages in this directory are in the upstream
-        # repodata.json
-        try:
-            package_metadata = package_repodata[package]
-        except KeyError:
-            logger.warning("%s is not in the upstream index. Removing...",
-                           package)
-            _remove_package(os.path.join(package_directory, package),
-                            reason="Package is not in the repodata index")
-        else:
-            # validate the integrity of the package, the size of the package and
-            # its hashes
-            logger.info('Validating %s. %s of %s', package, idx,
-                        len(local_packages))
-            _validate(os.path.join(package_directory, package),
-                      md5=package_metadata.get('md5'),
-                      size=package_metadata.get('size'))
+
+    # create argument list (necessary because multiprocessing.Pool.map does not
+    # accept additional args to be passed to the mapped function)
+    num_packages = len(local_packages)
+    val_func_arg_list = [(package, num, num_packages, package_repodata,
+                          package_directory)
+                         for num, package in enumerate(sorted(local_packages))]
+
+    if num_threads is 1 or num_threads is None:
+        map(_validate_or_remove_package, val_func_arg_list)
+    else:
+        if num_threads is 0:
+            logger.debug('`num_threads=0` will be replaced by num of all '
+                         'available cores')
+            num_threads = os.cpu_count()
+        logger.info('Will use {} threads for package validation.'
+                    ''.format(num_threads))
+        p = multiprocessing.Pool(num_threads)
+        p.map(_validate_or_remove_package, val_func_arg_list)
+        p.close()
+        p.join()
+
+
+def _validate_or_remove_package(args):
+    """Validata or remove package.
+
+    Parameters
+    ----------
+    args : tuple
+        - `args[0]` is `package`.
+        - `args[1]` is the number of the package in the list of all packages.
+        - `args[2]` is the number of all packages.
+        - `args[3]` is `package_repodata`.
+        - `args[4]` is `package_directory`.
+    """
+    # unpack arg tuple tuple
+    package = args[0]
+    num = args[1]
+    num_packages = args[2]
+    package_repodata = args[3]
+    package_directory = args[4]
+
+    # ensure the packages in this directory are in the upstream
+    # repodata.json
+    try:
+        package_metadata = package_repodata[package]
+    except KeyError:
+        logger.warning("%s is not in the upstream index. Removing...",
+                       package)
+        _remove_package(os.path.join(package_directory, package),
+                        reason="Package is not in the repodata index")
+    else:
+        # validate the integrity of the package, the size of the package and
+        # its hashes
+        logger.info('Validating {:4d} of {:4d}: {}.'.format(num, num_packages,
+                                                            package))
+        _validate(os.path.join(package_directory, package),
+                  md5=package_metadata.get('md5'),
+                  size=package_metadata.get('size'))
 
 
 def main(upstream_channel, target_directory, temp_directory, platform,
-         blacklist=None, whitelist=None):
+         blacklist=None, whitelist=None, num_threads=1):
     """
 
     Parameters
@@ -406,6 +467,10 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         The values of blacklist should be (key, glob) where key is one of the
         keys in the repodata['packages'] dicts and glob is a thing to match
         on.  Note that all comparisons will be laundered through lowercasing.
+    num_threads : int
+        Number of threads to be used for concurrent validation.  Defaults to
+        `num_threads=1` for non-concurrent mode.  To use all available cores,
+        set `num_threads=0`.
 
     Notes
     -----
@@ -456,7 +521,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # 1. validate local repo
     # validating all packages is taking many hours.
     # _validate_packages(repodata=repodata,
-    #                    package_directory=local_directory)
+    #                    package_directory=local_directory,
+    #                    num_threads=num_threads)
 
     # 2. figure out blacklisted packages
     blacklist_packages = {}
@@ -490,8 +556,9 @@ def main(upstream_channel, target_directory, temp_directory, platform,
 
     # 4. Validate all local packages
     # construct the desired package repodata
-    desired_repodata = {pkgname: packages[pkgname] for pkgname in possible_packages_to_mirror}
-    _validate_packages(desired_repodata, local_directory)
+    desired_repodata = {pkgname: packages[pkgname]
+                        for pkgname in possible_packages_to_mirror}
+    _validate_packages(desired_repodata, local_directory, num_threads)
 
     # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
@@ -517,7 +584,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
             _download(url, download_dir)
 
         # validate all packages in the download directory
-        _validate_packages(packages, download_dir)
+        _validate_packages(packages, download_dir, num_threads=num_threads)
         logger.debug('contents of %s are %s',
                      download_dir,
                      pformat(os.listdir(download_dir)))

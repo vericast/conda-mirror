@@ -41,7 +41,8 @@ def test_version():
 @pytest.mark.parametrize(
     'channel,platform',
     itertools.product([anaconda_channel, 'conda-forge'], ['linux-64']))
-def test_cli(tmpdir, channel, platform, repodata):
+@pytest.mark.parametrize('num_threads', [0, 1, 4])
+def test_cli(tmpdir, channel, platform, repodata, num_threads):
     info, packages = repodata[channel]
     smallest_package = sorted(packages, key=lambda x: packages[x]['size'])[0]
     # drop the html stuff. get just the channel
@@ -55,31 +56,34 @@ blacklist:
     - name: "*"
 whitelist:
     - name: {}
-      version: {}'''.format(
-            packages[smallest_package]['name'],
-            packages[smallest_package]['version']))
+      version: {}'''.format(packages[smallest_package]['name'],
+                            packages[smallest_package]['version']))
     cli_args = ("conda-mirror"
                 " --config {config}"
                 " --upstream-channel {channel}"
                 " --target-directory {target_directory}"
                 " --platform {platform}"
+                " --num-threads {num_threads}"
                 " --pdb"
-                " --verbose"
+                " -vvv"
                 ).format(config=f1.strpath,
                          channel=channel,
                          target_directory=f2.strpath,
-                         platform=platform)
+                         platform=platform,
+                         num_threads=num_threads)
     old_argv = copy.deepcopy(sys.argv)
     sys.argv = cli_args.split(' ')
-    # Write a package that does not exist in the upstream repodata into the mirror path
-    # to make sure we exercise a broken code path
+    # Write a package that does not exist in the upstream repodata into the
+    # mirror path to make sure we exercise a broken code path
     # https://github.com/maxpoint/conda-mirror/issues/29
     _write_bad_package(channel_dir=f2.strpath, platform_name=platform,
                        pkg_name='bad-1-0.tar.bz2')
-    # Write a bad package that does exist in the upstream repodata into the mirror path
-    # to make sure we can handle that case too
+
+    # Write a bad package that does exist in the upstream repodata into the
+    # mirror path to make sure we can handle that case too
     info, packages = repodata[channel]
     upstream_pkg_name = next(iter(packages.keys()))
+
     _write_bad_package(channel_dir=f2.strpath, platform_name=platform,
                        pkg_name=upstream_pkg_name)
     conda_mirror.cli()
@@ -104,10 +108,10 @@ whitelist:
         assert len(rd['info']) == len(disk_info)
         assert len(rd['packages']) == len(disk_packages)
 
+
 def _write_bad_package(channel_dir, platform_name, pkg_name):
     target_dir = os.path.join(channel_dir, platform_name)
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
     with bz2.BZ2File(os.path.join(target_dir, pkg_name), 'wb') as f:
         f.write("This is a fake package".encode())
-
