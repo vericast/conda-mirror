@@ -342,10 +342,10 @@ def _list_conda_packages(local_dir):
 def _validate_packages(package_repodata, package_directory):
     """Validate local conda packages.
 
-    NOTE: This is slow.
-    NOTE2: This will remove any packages that are in `package_directory` that
+    NOTE1: This will remove any packages that are in `package_directory` that
            are not in `repodata` and also any packages that fail the package
            validation
+    NOTE2: This will be hard to kill using CTRL-C.
 
     Parameters
     ----------
@@ -357,7 +357,23 @@ def _validate_packages(package_repodata, package_directory):
     # validate local conda packages
     local_packages = _list_conda_packages(package_directory)
 
-    map(_validate_packages_loop, sorted(local_packages))
+    # set up pool of workers
+    num_threads = _read_num_threads_from_env()
+    logger.debug('Will use {} threads for package validation.'
+                 ''.format(num_threads))
+    p = multiprocessing.Pool(num_threads)
+
+    # parallel validation
+    if num_threads == 0:
+        map(_validate_packages_loop, sorted(local_packages))
+    else:
+        p.map(_validate_packages_loop, sorted(local_packages))
+
+    # make sure pool is properly shut down
+    p.close()
+    p.terminate()
+    p.join()
+
 
 def _validate_packages_loop(package):
 
