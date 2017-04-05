@@ -358,13 +358,32 @@ def _validate_packages(package_repodata, package_directory):
     # validate local conda packages
     local_packages = _list_conda_packages(package_directory)
 
+    def _validate_packages_loop(package):
+
+        # ensure the packages in this directory are in the upstream
+        # repodata.json
+        try:
+            package_metadata = package_repodata[package]
+        except KeyError:
+            logger.warning("%s is not in the upstream index. Removing...",
+                           package)
+            _remove_package(os.path.join(package_directory, package),
+                            reason="Package is not in the repodata index")
+        else:
+            # validate the integrity of the package, the size of the package and
+            # its hashes
+            logger.info('Validating {}.'.format(package))
+            _validate(os.path.join(package_directory, package),
+                      md5=package_metadata.get('md5'),
+                      size=package_metadata.get('size'))
+
     # Get number of threads and run concurrent validation if number of threads
     # is set.  Use serial map otherwise.
     num_threads = _read_num_threads_from_env()
 
     if num_threads is not None:
-        logger.debug('Will use {} threads for package validation.'
-                     ''.format(num_threads))
+        logger.info('Will use {} threads for package validation.'
+                    ''.format(num_threads))
         p = multiprocessing.Pool(num_threads)
         p.map(_validate_packages_loop, sorted(local_packages))
         p.close()
@@ -372,28 +391,6 @@ def _validate_packages(package_repodata, package_directory):
         p.join()
     else:
         map(_validate_packages_loop, sorted(local_packages))
-
-
-
-
-def _validate_packages_loop(package):
-
-    # ensure the packages in this directory are in the upstream
-    # repodata.json
-    try:
-        package_metadata = package_repodata[package]
-    except KeyError:
-        logger.warning("%s is not in the upstream index. Removing...",
-                       package)
-        _remove_package(os.path.join(package_directory, package),
-                        reason="Package is not in the repodata index")
-    else:
-        # validate the integrity of the package, the size of the package and
-        # its hashes
-        logger.info('Validating {}.'.format(package))
-        _validate(os.path.join(package_directory, package),
-                  md5=package_metadata.get('md5'),
-                  size=package_metadata.get('size'))
 
 
 def _read_num_threads_from_env():
