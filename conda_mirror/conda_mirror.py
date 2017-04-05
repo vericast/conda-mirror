@@ -376,6 +376,24 @@ def _validate_packages(package_repodata, package_directory):
                       size=package_metadata.get('size'))
 
 
+def _read_num_threads_from_env():
+    """Read number of threads for concurrent validation.
+
+    Returns
+    -------
+    num_threads : int
+        Number of threads to be used for concurrent validation.  Read from the
+        environment var `CONDA_MIRROR_NUM_THREADS`.  `num_threads` is set to 0
+        if `CONDA_MIRROR_NUM_THREADS` is not defined.
+    """
+    num_threads_var_name = "CONDA_MIRROR_NUM_THREADS"
+    if num_threads_var_name in os.environ.keys():
+        num_threads = int(os.environ[num_threads_var_name])
+    else:
+        num_threads = 0
+    return num_threads
+
+
 def main(upstream_channel, target_directory, temp_directory, platform,
          blacklist=None, whitelist=None):
     """
