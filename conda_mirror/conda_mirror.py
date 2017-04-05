@@ -358,22 +358,22 @@ def _validate_packages(package_repodata, package_directory):
     # validate local conda packages
     local_packages = _list_conda_packages(package_directory)
 
-    # set up pool of workers
+    # Get number of threads and run concurrent validation if number of threads
+    # is set.  Use serial map otherwise.
     num_threads = _read_num_threads_from_env()
-    logger.debug('Will use {} threads for package validation.'
-                 ''.format(num_threads))
-    p = multiprocessing.Pool(num_threads)
 
-    # parallel validation
-    if num_threads == 0:
-        map(_validate_packages_loop, sorted(local_packages))
-    else:
+    if num_threads is not None:
+        logger.debug('Will use {} threads for package validation.'
+                     ''.format(num_threads))
+        p = multiprocessing.Pool(num_threads)
         p.map(_validate_packages_loop, sorted(local_packages))
+        p.close()
+        p.terminate()
+        p.join()
+    else:
+        map(_validate_packages_loop, sorted(local_packages))
 
-    # make sure pool is properly shut down
-    p.close()
-    p.terminate()
-    p.join()
+
 
 
 def _validate_packages_loop(package):
@@ -403,15 +403,13 @@ def _read_num_threads_from_env():
     -------
     num_threads : int
         Number of threads to be used for concurrent validation.  Read from the
-        environment var `CONDA_MIRROR_NUM_THREADS`.  `num_threads` is set to 0
+        environment var `CONDA_MIRROR_NUM_THREADS`.  `num_threads` will be None
         if `CONDA_MIRROR_NUM_THREADS` is not defined.
     """
     num_threads_var_name = "CONDA_MIRROR_NUM_THREADS"
     if num_threads_var_name in os.environ.keys():
         num_threads = int(os.environ[num_threads_var_name])
-    else:
-        num_threads = 0
-    return num_threads
+        return num_threads
 
 
 def main(upstream_channel, target_directory, temp_directory, platform,
