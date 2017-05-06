@@ -382,15 +382,18 @@ def _validate_packages(package_repodata, package_directory, num_threads=1):
     val_func_arg_list = [(package, num, package_repodata, package_directory)
                          for num, package in enumerate(sorted(local_packages))]
 
-    if num_threads is None or num_threads is 0:
+    if num_threads is 1 or num_threads is None:
         map(_valiadate_or_remove_package, val_func_arg_list)
     else:
+        if num_threads is 0:
+            logger.debug('`num_threads=0` will be replaced by num of all '
+                         'available cores')
+            num_threads = os.cpu_count()
         logger.info('Will use {} threads for package validation.'
                     ''.format(num_threads))
         p = multiprocessing.Pool(num_threads)
         p.map(_valiadate_or_remove_package, val_func_arg_list)
         p.close()
-        p.terminate()
         p.join()
 
 
