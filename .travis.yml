@@ -12,7 +12,9 @@ install:
 
 script:
 - conda-mirror -h
-- pytest --cov=conda_mirror --cov-report term-missing -v test/test_conda_mirror.py -s
+- coverage run --concurrency=multiprocessing run_tests.py
+- coverage combine
+- coverage report -m
 
 after_success:
 - codecov
