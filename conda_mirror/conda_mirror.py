@@ -424,7 +424,7 @@ def _valiadate_or_remove_package(args):
     else:
         # validate the integrity of the package, the size of the package and
         # its hashes
-        total_num = len(package_metadata)
+        total_num = len(package_repodata)
         logger.info('Validating {:4d} of {:4d}: {}.'.format(num, total_num,
                                                             package))
         _validate(os.path.join(package_directory, package),
