@@ -160,6 +160,13 @@ def _make_arg_parser():
         default=False,
     )
     ap.add_argument(
+        '--num-threads',
+        action="store",
+        default=1,
+        type=int,
+        help="Num of threads for validation. 1: Serial mode. 0: All available."
+        )
+    ap.add_argument(
         '--version',
         action="store_true",
         help="Print version and quit",
@@ -229,7 +236,7 @@ def cli():
     whitelist = config_dict.get('whitelist')
 
     main(args.upstream_channel, args.target_directory, args.temp_directory,
-         args.platform, blacklist, whitelist)
+         args.platform, blacklist, whitelist, args.num_threads)
 
 
 def _remove_package(pkg_path, reason):
@@ -347,13 +354,14 @@ def _list_conda_packages(local_dir):
     return fnmatch.filter(contents, "*.tar.bz2")
 
 
-def _validate_packages(package_repodata, package_directory):
+def _validate_packages(package_repodata, package_directory, num_threads=1):
     """Validate local conda packages.
 
     NOTE1: This will remove any packages that are in `package_directory` that
            are not in `repodata` and also any packages that fail the package
            validation
-    NOTE2: This will be hard to kill using CTRL-C.
+    NOTE2: In concurrent mode (num_threads is not None) this will be hard to
+           kill using CTRL-C.
 
     Parameters
     ----------
@@ -361,37 +369,48 @@ def _validate_packages(package_repodata, package_directory):
         The contents of repodata.json
     package_directory : str
         Path to the local repo that contains conda packages
+    num_threads : int
+        Number of threads to be used for concurrent validation.  Defaults to
+        `num_threads=1` for non-concurrent mode.  To use all available cores,
+        set `num_threads=0`.
     """
     # validate local conda packages
     local_packages = _list_conda_packages(package_directory)
 
-    # Get number of threads and run concurrent validation if number of threads
-    # is set.  Use serial map otherwise.
-    num_threads = _read_num_threads_from_env()
-
     # create argument list (necessary because multiprocessing.Pool.map does not
     # accept additional args to be passed to the mapped function)
-    val_func_arg_list = [(package, package_repodata, package_directory) for
-                         package in sorted(local_packages)]
+    val_func_arg_list = [(package, num, package_repodata, package_directory)
+                         for num, package in enumerate(sorted(local_packages))]
 
-    if num_threads is not None:
+    if num_threads is None or num_threads is 0:
+        map(_valiadate_or_remove_package, val_func_arg_list)
+    else:
         logger.info('Will use {} threads for package validation.'
                     ''.format(num_threads))
         p = multiprocessing.Pool(num_threads)
-        p.map(_validate_packages_loop, val_func_arg_list)
+        p.map(_valiadate_or_remove_package, val_func_arg_list)
         p.close()
         p.terminate()
         p.join()
-    else:
-        map(_validate_packages_loop, val_func_arg_list)
 
 
-def _validate_packages_loop(arg_tuple):
+def _valiadate_or_remove_package(args):
+    """Validata or remove package.
 
+    Parameters
+    ----------
+    args : tuple
+        - `args[0]` is `package`.
+        - `args[1]` is the number of the package in the list of all packages.
+        - `args[2]` is `package_repodata`.
+        - `args[3]` is `package_directory`.
+
+    """
     # unpack arg tuple tuple
-    package = arg_tuple[0]
-    package_repodata = arg_tuple[1]
-    package_directory = arg_tuple[2]
+    package = args[0]
+    num = args[1]
+    package_repodata = args[2]
+    package_directory = args[3]
 
     # ensure the packages in this directory are in the upstream
     # repodata.json
@@ -405,30 +424,16 @@ def _validate_packages_loop(arg_tuple):
     else:
         # validate the integrity of the package, the size of the package and
         # its hashes
-        logger.info('Validating {}.'.format(package))
+        total_num = len(package_metadata)
+        logger.info('Validating {:4d} of {:4d}: {}.'.format(num, total_num,
+                                                            package))
         _validate(os.path.join(package_directory, package),
                   md5=package_metadata.get('md5'),
                   size=package_metadata.get('size'))
 
 
-def _read_num_threads_from_env():
-    """Read number of threads for concurrent validation.
-
-    Returns
-    -------
-    num_threads : int
-        Number of threads to be used for concurrent validation.  Read from the
-        environment var `CONDA_MIRROR_NUM_THREADS`.  `num_threads` will be None
-        if `CONDA_MIRROR_NUM_THREADS` is not defined.
-    """
-    num_threads_var_name = "CONDA_MIRROR_NUM_THREADS"
-    if num_threads_var_name in os.environ.keys():
-        num_threads = int(os.environ[num_threads_var_name])
-        return num_threads
-
-
 def main(upstream_channel, target_directory, temp_directory, platform,
-         blacklist=None, whitelist=None):
+         blacklist=None, whitelist=None, num_threads=1):
     """
 
     Parameters
@@ -457,6 +462,10 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         The values of blacklist should be (key, glob) where key is one of the
         keys in the repodata['packages'] dicts and glob is a thing to match
         on.  Note that all comparisons will be laundered through lowercasing.
+    num_threads : int
+        Number of threads to be used for concurrent validation.  Defaults to
+        `num_threads=1` for non-concurrent mode.  To use all available cores,
+        set `num_threads=0`.
 
     Notes
     -----
@@ -507,7 +516,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # 1. validate local repo
     # validating all packages is taking many hours.
     # _validate_packages(repodata=repodata,
-    #                    package_directory=local_directory)
+    #                    package_directory=local_directory,
+    #                    num_threads=num_threads)
 
     # 2. figure out blacklisted packages
     blacklist_packages = {}
@@ -543,7 +553,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # construct the desired package repodata
     desired_repodata = {pkgname: packages[pkgname]
                         for pkgname in possible_packages_to_mirror}
-    _validate_packages(desired_repodata, local_directory)
+    _validate_packages(desired_repodata, local_directory, num_threads)
 
     # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
@@ -569,7 +579,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
             _download(url, download_dir)
 
         # validate all packages in the download directory
-        _validate_packages(packages, download_dir)
+        _validate_packages(packages, download_dir, num_threads=num_threads)
         logger.debug('contents of %s are %s',
                      download_dir,
                      pformat(os.listdir(download_dir)))

@@ -41,7 +41,8 @@ def test_version():
 @pytest.mark.parametrize(
     'channel,platform',
     itertools.product([anaconda_channel, 'conda-forge'], ['linux-64']))
-def test_cli(tmpdir, channel, platform, repodata):
+@pytest.mark.parametrize('num_threads', [0, 1, 4])
+def test_cli(tmpdir, channel, platform, repodata, num_threads):
     info, packages = repodata[channel]
     smallest_package = sorted(packages, key=lambda x: packages[x]['size'])[0]
     # drop the html stuff. get just the channel
@@ -62,12 +63,14 @@ whitelist:
                 " --upstream-channel {channel}"
                 " --target-directory {target_directory}"
                 " --platform {platform}"
+                " --num-threads {num_threads}"
                 " --pdb"
                 " --verbose"
                 ).format(config=f1.strpath,
                          channel=channel,
                          target_directory=f2.strpath,
-                         platform=platform)
+                         platform=platform,
+                         num_threads=num_threads)
     old_argv = copy.deepcopy(sys.argv)
     sys.argv = cli_args.split(' ')
     # Write a package that does not exist in the upstream repodata into the
