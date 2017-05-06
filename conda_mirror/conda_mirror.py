@@ -28,8 +28,9 @@ DEFAULT_PLATFORMS = ['linux-64',
 
 
 def _maybe_split_channel(channel):
-    """Split channel if it is fully qualified. Otherwise default to
-    conda.anaconda.org
+    """Split channel if it is fully qualified.
+
+    Otherwise default to conda.anaconda.org
 
     Parameters
     ----------
@@ -40,13 +41,15 @@ def _maybe_split_channel(channel):
     Returns
     -------
     download_template : str
-        defaults to "https://conda.anaconda.org/{channel}/{platform}/{file_name}"
+        defaults to
+        "https://conda.anaconda.org/{channel}/{platform}/{file_name}"
         The base url will be modified if the `channel` input parameter is
         fully qualified
     channel : str
         The name-only channel. If the channel input param is something like
         "conda-forge", then "conda-forge" will be returned. If the channel
         input param is something like "https://repo.continuum.io/pkgs/free/"
+
     """
     # strip trailing slashes
     channel = channel.strip('/')
@@ -61,7 +64,8 @@ def _maybe_split_channel(channel):
     # looks like we are being given a fully qualified channel
     download_base, channel = channel.rsplit('/', 1)
     download_template = download_base + url_suffix
-    logger.debug('download_template=%s. channel=%s', download_template, channel)
+    logger.debug('download_template=%s. channel=%s',
+                 download_template, channel)
     return download_template, channel
 
 
@@ -80,6 +84,7 @@ def _match(all_packages, key_glob_dict):
     matched : dict
         Iterable of package metadata dicts which match the `target_packages`
         (key, glob_value) tuples
+
     """
     matched = dict()
     key_glob_dict = {key.lower(): glob.lower()
@@ -109,7 +114,8 @@ def _make_arg_parser():
     argument_parser : argparse.ArgumentParser
         The instantiated argument parser for this CLI
     """
-    ap = argparse.ArgumentParser(description="CLI interface for conda-mirror.py")
+    ap = argparse.ArgumentParser(
+        description="CLI interface for conda-mirror.py")
 
     ap.add_argument(
         '--upstream-channel',
@@ -123,10 +129,11 @@ def _make_arg_parser():
     )
     ap.add_argument(
         '--temp-directory',
-        help=('Temporary download location for the packages. Defaults to a '
-              'randomly selected temporary directory. Note that you might need '
-              'to specify a different location if your default temp directory '
-              'has less available space than your mirroring target'),
+        help=(
+            'Temporary download location for the packages. Defaults to a '
+            'randomly selected temporary directory. Note that you might need '
+            'to specify a different location if your default temp directory '
+            'has less available space than your mirroring target'),
         default=tempfile.gettempdir()
     )
     ap.add_argument(
@@ -239,7 +246,6 @@ def _remove_package(pkg_path, reason):
     os.remove(pkg_path)
 
 
-
 def _validate(filename, md5=None, size=None):
     """Validate the conda package tarfile located at `filename` with any of the
     passed in options `md5` or `size. Also implicitly validate that
@@ -274,7 +280,8 @@ def _validate(filename, md5=None, size=None):
         if calc != md5:
             _remove_package(
                 filename,
-                reason="Failed md5 validation. Expected: %s. Computed: %s" % (calc, md5))
+                reason="Failed md5 validation. Expected: %s. Computed: %s"
+                % (calc, md5))
             return
 
 
@@ -534,7 +541,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
 
     # 4. Validate all local packages
     # construct the desired package repodata
-    desired_repodata = {pkgname: packages[pkgname] for pkgname in possible_packages_to_mirror}
+    desired_repodata = {pkgname: packages[pkgname]
+                        for pkgname in possible_packages_to_mirror}
     _validate_packages(desired_repodata, local_directory)
 
     # 5. figure out final list of packages to mirror

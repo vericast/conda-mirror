@@ -55,9 +55,8 @@ blacklist:
     - name: "*"
 whitelist:
     - name: {}
-      version: {}'''.format(
-            packages[smallest_package]['name'],
-            packages[smallest_package]['version']))
+      version: {}'''.format(packages[smallest_package]['name'],
+                            packages[smallest_package]['version']))
     cli_args = ("conda-mirror"
                 " --config {config}"
                 " --upstream-channel {channel}"
@@ -71,13 +70,13 @@ whitelist:
                          platform=platform)
     old_argv = copy.deepcopy(sys.argv)
     sys.argv = cli_args.split(' ')
-    # Write a package that does not exist in the upstream repodata into the mirror path
-    # to make sure we exercise a broken code path
+    # Write a package that does not exist in the upstream repodata into the
+    # mirror path to make sure we exercise a broken code path
     # https://github.com/maxpoint/conda-mirror/issues/29
     _write_bad_package(channel_dir=f2.strpath, platform_name=platform,
                        pkg_name='bad-1-0.tar.bz2')
-    # Write a bad package that does exist in the upstream repodata into the mirror path
-    # to make sure we can handle that case too
+    # Write a bad package that does exist in the upstream repodata into the
+    # mirror path to make sure we can handle that case too
     upstream_pkg_name = next(iter(repodata.keys()))
     _write_bad_package(channel_dir=f2.strpath, platform_name=platform,
                        pkg_name=upstream_pkg_name)
@@ -103,10 +102,10 @@ whitelist:
         assert len(rd['info']) == len(disk_info)
         assert len(rd['packages']) == len(disk_packages)
 
+
 def _write_bad_package(channel_dir, platform_name, pkg_name):
     target_dir = os.path.join(channel_dir, platform_name)
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
     with bz2.BZ2File(os.path.join(target_dir, pkg_name), 'wb') as f:
         f.write("This is a fake package".encode())
-
