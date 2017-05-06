@@ -12,10 +12,6 @@ install:
 
 script:
 - conda-mirror -h
-- echo "Running test in serial mode."
-- coverage run run_tests.py
-- export CONDA_MIRROR_NUM_THREADS=2
-- echo "Running test in concurrent mode with" $CONDA_MIRROR_NUM_THREADS "threads."
 - coverage run run_tests.py
 - coverage report -m
 
