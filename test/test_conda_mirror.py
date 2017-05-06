@@ -65,7 +65,7 @@ whitelist:
                 " --platform {platform}"
                 " --num-threads {num_threads}"
                 " --pdb"
-                " --verbose"
+                " -vvv"
                 ).format(config=f1.strpath,
                          channel=channel,
                          target_directory=f2.strpath,
