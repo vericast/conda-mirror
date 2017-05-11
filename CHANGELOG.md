@@ -1,8 +1,19 @@
 # Change Log
 
-## [Unreleased](https://github.com/maxpoint/conda-mirror/tree/HEAD)
+## [0.7.0](https://github.com/maxpoint/conda-mirror/tree/0.7.0) (2017-05-11)
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.6.6...0.7.0)
 
-[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.6.5...HEAD)
+**Closed issues:**
+
+- concurrent package validation [\#43](https://github.com/maxpoint/conda-mirror/issues/43)
+
+**Merged pull requests:**
+
+- Add concurrent package validation [\#48](https://github.com/maxpoint/conda-mirror/pull/48) ([willirath](https://github.com/willirath))
+- TST: Fix broken test [\#46](https://github.com/maxpoint/conda-mirror/pull/46) ([ericdill](https://github.com/ericdill))
+
+## [0.6.6](https://github.com/maxpoint/conda-mirror/tree/0.6.6) (2017-03-28)
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.6.5...0.6.6)
 
 **Implemented enhancements:**
 
