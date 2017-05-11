@@ -360,8 +360,8 @@ def _validate_packages(package_repodata, package_directory, num_threads=1):
     NOTE1: This will remove any packages that are in `package_directory` that
            are not in `repodata` and also any packages that fail the package
            validation
-    NOTE2: In concurrent mode (num_threads is not None) this will be hard to
-           kill using CTRL-C.
+    NOTE2: In concurrent mode (num_threads is not 1) this might be hard to kill
+           using CTRL-C.
 
     Parameters
     ----------
@@ -370,20 +370,22 @@ def _validate_packages(package_repodata, package_directory, num_threads=1):
     package_directory : str
         Path to the local repo that contains conda packages
     num_threads : int
-        Number of threads to be used for concurrent validation.  Defaults to
-        `num_threads=1` for non-concurrent mode.  To use all available cores,
-        set `num_threads=0`.
+        Number of concurrent processes to use. Set to `0` to use a number of
+        processes equal to the number of cores in the system. Defaults to `1`
+        (i.e. serial package validation).
     """
     # validate local conda packages
     local_packages = _list_conda_packages(package_directory)
 
     # create argument list (necessary because multiprocessing.Pool.map does not
     # accept additional args to be passed to the mapped function)
-    val_func_arg_list = [(package, num, package_repodata, package_directory)
+    num_packages = len(local_packages)
+    val_func_arg_list = [(package, num, num_packages, package_repodata,
+                          package_directory)
                          for num, package in enumerate(sorted(local_packages))]
 
     if num_threads is 1 or num_threads is None:
-        map(_valiadate_or_remove_package, val_func_arg_list)
+        map(_validate_or_remove_package, val_func_arg_list)
     else:
         if num_threads is 0:
             logger.debug('`num_threads=0` will be replaced by num of all '
@@ -392,12 +394,12 @@ def _validate_packages(package_repodata, package_directory, num_threads=1):
         logger.info('Will use {} threads for package validation.'
                     ''.format(num_threads))
         p = multiprocessing.Pool(num_threads)
-        p.map(_valiadate_or_remove_package, val_func_arg_list)
+        p.map(_validate_or_remove_package, val_func_arg_list)
         p.close()
         p.join()
 
 
-def _valiadate_or_remove_package(args):
+def _validate_or_remove_package(args):
     """Validata or remove package.
 
     Parameters
@@ -405,15 +407,16 @@ def _valiadate_or_remove_package(args):
     args : tuple
         - `args[0]` is `package`.
         - `args[1]` is the number of the package in the list of all packages.
-        - `args[2]` is `package_repodata`.
-        - `args[3]` is `package_directory`.
-
+        - `args[2]` is the number of all packages.
+        - `args[3]` is `package_repodata`.
+        - `args[4]` is `package_directory`.
     """
     # unpack arg tuple tuple
     package = args[0]
     num = args[1]
-    package_repodata = args[2]
-    package_directory = args[3]
+    num_packages = args[2]
+    package_repodata = args[3]
+    package_directory = args[4]
 
     # ensure the packages in this directory are in the upstream
     # repodata.json
@@ -427,8 +430,7 @@ def _valiadate_or_remove_package(args):
     else:
         # validate the integrity of the package, the size of the package and
         # its hashes
-        total_num = len(package_repodata)
-        logger.info('Validating {:4d} of {:4d}: {}.'.format(num, total_num,
+        logger.info('Validating {:4d} of {:4d}: {}.'.format(num, num_packages,
                                                             package))
         _validate(os.path.join(package_directory, package),
                   md5=package_metadata.get('md5'),
