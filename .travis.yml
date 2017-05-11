@@ -12,7 +12,8 @@ install:
 
 script:
 - conda-mirror -h
-- coverage run run_tests.py
+- coverage run --concurrency=multiprocessing run_tests.py
+- coverage combine
 - coverage report -m
 
 after_success:
