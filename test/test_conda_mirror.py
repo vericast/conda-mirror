@@ -132,8 +132,8 @@ def test_main(tmpdir, repodata):
 
     ret = conda_mirror.main(
         upstream_channel=channel,
-        target_directory=target_directory,
-        temp_directory=temp_directory,
+        target_directory=target_directory.strpath,
+        temp_directory=temp_directory.strpath,
         platform='linux-64',
         blacklist=[{'name': '*'}],
         whitelist=[{'name': packages[smallest_package]['name'],
