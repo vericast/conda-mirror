@@ -3,6 +3,7 @@ import copy
 import itertools
 import json
 import os
+from os.path import join
 import sys
 
 import pytest
@@ -38,13 +39,17 @@ def test_version():
     sys.argv = old_args
 
 
+def _get_smallest_package(packages):
+    return sorted(packages, key=lambda x: packages[x]['size'])[0]
+
+
 @pytest.mark.parametrize(
     'channel,platform',
     itertools.product([anaconda_channel, 'conda-forge'], ['linux-64']))
 @pytest.mark.parametrize('num_threads', [0, 1, 4])
 def test_cli(tmpdir, channel, platform, repodata, num_threads):
     info, packages = repodata[channel]
-    smallest_package = sorted(packages, key=lambda x: packages[x]['size'])[0]
+    smallest_package = _get_smallest_package(packages)
     # drop the html stuff. get just the channel
 
     f2 = tmpdir.mkdir(channel.rsplit('/', 1)[-1])
@@ -115,3 +120,25 @@ def _write_bad_package(channel_dir, platform_name, pkg_name):
         os.makedirs(target_dir)
     with bz2.BZ2File(os.path.join(target_dir, pkg_name), 'wb') as f:
         f.write("This is a fake package".encode())
+
+
+def test_main(tmpdir, repodata):
+    platform = 'linux-64'
+    channel = 'conda-forge'
+    target_directory = tmpdir.mkdir(platform)
+    temp_directory = tmpdir.mkdir(join(platform, 'temp'))
+    info, packages = repodata[channel]
+    smallest_package = _get_smallest_package(packages)
+
+    ret = conda_mirror.main(
+        upstream_channel=channel,
+        target_directory=target_directory,
+        temp_directory=temp_directory,
+        platform='linux-64',
+        blacklist=[{'name': '*'}],
+        whitelist=[{'name': packages[smallest_package]['name'],
+                    'version': packages[smallest_package]['version']}])
+
+    assert len(ret['downloaded']) > 0, "We should have downloaded at least one package"
+
+
