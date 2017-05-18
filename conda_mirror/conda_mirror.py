@@ -1,20 +1,21 @@
 import argparse
+import bz2
+from collections import defaultdict
+import hashlib
+import json
 import logging
+import multiprocessing
 import os
 import pdb
 import shutil
 import sys
-import json
 import tarfile
 import tempfile
-import traceback
-from glob import fnmatch
+import fnmatch
 from pprint import pformat
-import bz2
+
 import requests
 import yaml
-import hashlib
-import multiprocessing
 
 logger = None
 
@@ -201,7 +202,7 @@ def _init_logger(verbosity):
           file=sys.stdout)
 
 
-def cli():
+def _parse_and_format_args():
     """
     Collect arguments from sys.argv and invoke the main() function.
     """
@@ -214,12 +215,12 @@ def cli():
     if args.version:
         from . import __version__
         print(__version__)
-        return
+        sys.exit(1)
 
     for required in ('target_directory', 'platform', 'upstream_channel'):
         if not getattr(args, required):
             logger.error("Missing required argument: %s", required)
-            return
+            sys.exit(1)
     if args.pdb:
         # set the pdb_hook as the except hook for all exceptions
         def pdb_hook(exctype, value, traceback):
@@ -235,9 +236,20 @@ def cli():
     blacklist = config_dict.get('blacklist')
     whitelist = config_dict.get('whitelist')
 
-    main(args.upstream_channel, args.target_directory, args.temp_directory,
-         args.platform, blacklist, whitelist, args.num_threads)
+    return {
+        'upstream_channel': args.upstream_channel,
+        'target_directory': args.target_directory,
+        'temp_directory': args.temp_directory,
+        'platform': args.platform,
+        'num_threads': args.num_threads,
+        'blacklist': blacklist,
+        'whitelist': whitelist
 
+    }
+
+
+def cli():
+    main(**_parse_and_format_args())
 
 def _remove_package(pkg_path, reason):
     """
@@ -247,10 +259,18 @@ def _remove_package(pkg_path, reason):
     ----------
     pkg_path : str
         Path to a conda package that should be removed
+
+    Returns
+    -------
+    pkg_path : str
+        The full path to the package that is being removed
+    reason : str
+        The reason why the package is being removed
     """
     msg = "Removing: %s. Reason: %s"
     logger.warning(msg, pkg_path, reason)
     os.remove(pkg_path)
+    return pkg_path, msg
 
 
 def _validate(filename, md5=None, size=None):
@@ -269,6 +289,13 @@ def _validate(filename, md5=None, size=None):
     size : int, optional
         if provided, stat the file at `filename` and make sure its size
         matches `size`
+
+    Returns
+    -------
+    pkg_path : str
+        The full path to the package that is being removed
+    reason : str
+        The reason why the package is being removed
     """
     try:
         t = tarfile.open(filename)
@@ -276,20 +303,19 @@ def _validate(filename, md5=None, size=None):
     except tarfile.TarError:
         logger.info("Validation failed because conda package is corrupted.",
                     exc_info=True)
-        _remove_package(filename, reason="Tarfile read failure")
-        return
+        return _remove_package(filename, reason="Tarfile read failure")
     if size:
         if os.stat(filename).st_size != size:
-            _remove_package(filename, reason="Failed size test")
-            return
+            return _remove_package(filename, reason="Failed size test")
     if md5:
         calc = hashlib.md5(open(filename, 'rb').read()).hexdigest()
         if calc != md5:
-            _remove_package(
+            return _remove_package(
                 filename,
                 reason="Failed md5 validation. Expected: %s. Computed: %s"
                 % (calc, md5))
-            return
+
+    return filename, None
 
 
 def get_repodata(channel, platform):
@@ -385,7 +411,8 @@ def _validate_packages(package_repodata, package_directory, num_threads=1):
                          for num, package in enumerate(sorted(local_packages))]
 
     if num_threads is 1 or num_threads is None:
-        map(_validate_or_remove_package, val_func_arg_list)
+        validation_results = map(_validate_or_remove_package,
+                                 val_func_arg_list)
     else:
         if num_threads is 0:
             logger.debug('`num_threads=0` will be replaced by num of all '
@@ -394,9 +421,13 @@ def _validate_packages(package_repodata, package_directory, num_threads=1):
         logger.info('Will use {} threads for package validation.'
                     ''.format(num_threads))
         p = multiprocessing.Pool(num_threads)
-        p.map(_validate_or_remove_package, val_func_arg_list)
+        validation_results = p.map(_validate_or_remove_package,
+                                   val_func_arg_list)
         p.close()
         p.join()
+
+    return validation_results
+
 
 
 def _validate_or_remove_package(args):
@@ -410,6 +441,13 @@ def _validate_or_remove_package(args):
         - `args[2]` is the number of all packages.
         - `args[3]` is `package_repodata`.
         - `args[4]` is `package_directory`.
+
+    Returns
+    -------
+    pkg_path : str
+        The full path to the package that is being removed
+    reason : str
+        The reason why the package is being removed
     """
     # unpack arg tuple tuple
     package = args[0]
@@ -425,16 +463,17 @@ def _validate_or_remove_package(args):
     except KeyError:
         logger.warning("%s is not in the upstream index. Removing...",
                        package)
-        _remove_package(os.path.join(package_directory, package),
-                        reason="Package is not in the repodata index")
-    else:
-        # validate the integrity of the package, the size of the package and
-        # its hashes
-        logger.info('Validating {:4d} of {:4d}: {}.'.format(num, num_packages,
-                                                            package))
-        _validate(os.path.join(package_directory, package),
-                  md5=package_metadata.get('md5'),
-                  size=package_metadata.get('size'))
+        reason = "Package is not in the repodata index"
+        package_path = os.path.join(package_directory, package)
+        return _remove_package(package_path, reason=reason)
+    # validate the integrity of the package, the size of the package and
+    # its hashes
+    logger.info('Validating {:4d} of {:4d}: {}.'.format(num, num_packages,
+                                                        package))
+    package_path = os.path.join(package_directory, package)
+    return _validate(package_path,
+                     md5=package_metadata.get('md5'),
+                     size=package_metadata.get('size'))
 
 
 def main(upstream_channel, target_directory, temp_directory, platform,
@@ -471,6 +510,16 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         Number of threads to be used for concurrent validation.  Defaults to
         `num_threads=1` for non-concurrent mode.  To use all available cores,
         set `num_threads=0`.
+
+    Returns
+    -------
+    dict
+        Summary of what was removed and what was downloaded.
+        keys are:
+        - validation : set of (path, reason) for each package that was validated.
+                       packages where reason=None is a sentinel for a successful validation
+        - download : set of (url, download_path) for each package that
+                     was downloaded
 
     Notes
     -----
@@ -510,6 +559,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # 7. copy new packages to repo directory
     # 8. download repodata.json and repodata.json.bz2
     # 9. copy new repodata.json and repodata.json.bz2 into the repo
+    summary = defaultdict(set)
 
     # Implementation:
     if not os.path.exists(os.path.join(target_directory, platform)):
@@ -558,7 +608,9 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # construct the desired package repodata
     desired_repodata = {pkgname: packages[pkgname]
                         for pkgname in possible_packages_to_mirror}
-    _validate_packages(desired_repodata, local_directory, num_threads)
+
+    validation_results = _validate_packages(desired_repodata, local_directory, num_threads)
+    summary['validation'].update(validation_results)
 
     # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
@@ -582,9 +634,12 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                 platform=platform,
                 file_name=package_name)
             _download(url, download_dir)
+            summary['download'].add((url, download_dir))
 
         # validate all packages in the download directory
-        _validate_packages(packages, download_dir, num_threads=num_threads)
+        validation_results = _validate_packages(packages, download_dir,
+                                                num_threads=num_threads)
+        summary['validation'].update(validation_results)
         logger.debug('contents of %s are %s',
                      download_dir,
                      pformat(os.listdir(download_dir)))
@@ -622,6 +677,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         os.makedirs(noarch_path, exist_ok=True)
         noarch_repodata = {'info': {}, 'packages': {}}
         _write_repodata(noarch_path, noarch_repodata)
+
+    return summary
 
 
 def _write_repodata(package_dir, repodata_dict):
