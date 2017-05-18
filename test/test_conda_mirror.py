@@ -35,7 +35,8 @@ def test_match(repodata):
 def test_version():
     old_args = copy.copy(sys.argv)
     sys.argv = ['conda-mirror', '--version']
-    conda_mirror.cli()
+    with pytest.raises(SystemExit):
+        conda_mirror.cli()
     sys.argv = old_args
 
 
@@ -139,6 +140,7 @@ def test_main(tmpdir, repodata):
         whitelist=[{'name': packages[smallest_package]['name'],
                     'version': packages[smallest_package]['version']}])
 
-    assert len(ret['downloaded']) > 0, "We should have downloaded at least one package"
+    assert len(ret['download']) > 0, "We should have downloaded at least one package"
+    assert len(ret['validation']) > 0, "We should have validated at least one package"
 
 

@@ -202,7 +202,7 @@ def _init_logger(verbosity):
           file=sys.stdout)
 
 
-def cli():
+def _parse_and_format_args():
     """
     Collect arguments from sys.argv and invoke the main() function.
     """
@@ -215,12 +215,12 @@ def cli():
     if args.version:
         from . import __version__
         print(__version__)
-        return
+        sys.exit(1)
 
     for required in ('target_directory', 'platform', 'upstream_channel'):
         if not getattr(args, required):
             logger.error("Missing required argument: %s", required)
-            return
+            sys.exit(1)
     if args.pdb:
         # set the pdb_hook as the except hook for all exceptions
         def pdb_hook(exctype, value, traceback):
@@ -236,9 +236,20 @@ def cli():
     blacklist = config_dict.get('blacklist')
     whitelist = config_dict.get('whitelist')
 
-    main(args.upstream_channel, args.target_directory, args.temp_directory,
-         args.platform, blacklist, whitelist, args.num_threads)
+    return {
+        'upstream_channel': args.upstream_channel,
+        'target_directory': args.target_directory,
+        'temp_directory': args.temp_directory,
+        'platform': args.platform,
+        'num_threads': args.num_threads,
+        'blacklist': blacklist,
+        'whitelist': whitelist
 
+    }
+
+
+def cli():
+    main(**_parse_and_format_args())
 
 def _remove_package(pkg_path, reason):
     """
@@ -304,7 +315,7 @@ def _validate(filename, md5=None, size=None):
                 reason="Failed md5 validation. Expected: %s. Computed: %s"
                 % (calc, md5))
 
-    return filename, 'This is fine'  # http://imgur.com/c4jt321
+    return filename, None
 
 
 def get_repodata(channel, platform):
@@ -415,8 +426,8 @@ def _validate_packages(package_repodata, package_directory, num_threads=1):
         p.close()
         p.join()
 
-    return [(path, reason) for path, reason in validation_results
-            if reason is not None]
+    return validation_results
+
 
 
 def _validate_or_remove_package(args):
@@ -505,7 +516,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     dict
         Summary of what was removed and what was downloaded.
         keys are:
-        - removed : set of (path, reason) for each package that was removed
+        - validation_results : set of (path, reason) for each package that was validated.
+                               packages where reason=None is a sentinel for a successful validation
         - downloaded : set of (url, download_path) for each package that
                        was downloaded
 
@@ -597,8 +609,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     desired_repodata = {pkgname: packages[pkgname]
                         for pkgname in possible_packages_to_mirror}
 
-    removed = _validate_packages(desired_repodata, local_directory, num_threads)
-    summary['removed'].update(removed)
+    validation_results = _validate_packages(desired_repodata, local_directory, num_threads)
+    summary['validation'].update(validation_results)
 
     # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
@@ -622,12 +634,12 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                 platform=platform,
                 file_name=package_name)
             _download(url, download_dir)
-            summary['downloaded'].add((url, download_dir))
+            summary['download'].add((url, download_dir))
 
         # validate all packages in the download directory
-        removed = _validate_packages(packages, download_dir,
-                                     num_threads=num_threads)
-        summary['removed'].update(removed)
+        validation_results = _validate_packages(packages, download_dir,
+                                                num_threads=num_threads)
+        summary['validation'].update(validation_results)
         logger.debug('contents of %s are %s',
                      download_dir,
                      pformat(os.listdir(download_dir)))
