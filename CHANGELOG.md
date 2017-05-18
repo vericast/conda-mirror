@@ -1,5 +1,13 @@
 # Change Log
 
+## [Unreleased](https://github.com/maxpoint/conda-mirror/tree/HEAD)
+
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.7.0...HEAD)
+
+**Merged pull requests:**
+
+- Capture information on downloaded and removed packages [\#50](https://github.com/maxpoint/conda-mirror/pull/50) ([ericdill](https://github.com/ericdill))
+
 ## [0.7.0](https://github.com/maxpoint/conda-mirror/tree/0.7.0) (2017-05-11)
 [Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.6.6...0.7.0)
 
