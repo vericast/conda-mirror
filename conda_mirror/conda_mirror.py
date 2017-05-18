@@ -516,10 +516,10 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     dict
         Summary of what was removed and what was downloaded.
         keys are:
-        - validation_results : set of (path, reason) for each package that was validated.
-                               packages where reason=None is a sentinel for a successful validation
-        - downloaded : set of (url, download_path) for each package that
-                       was downloaded
+        - validation : set of (path, reason) for each package that was validated.
+                       packages where reason=None is a sentinel for a successful validation
+        - download : set of (url, download_path) for each package that
+                     was downloaded
 
     Notes
     -----
