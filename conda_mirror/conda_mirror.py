@@ -219,8 +219,8 @@ def _parse_and_format_args():
 
     for required in ('target_directory', 'platform', 'upstream_channel'):
         if not getattr(args, required):
-            logger.error("Missing required argument: %s", required)
-            sys.exit(1)
+            raise ValueError("Missing command line argument: %s", required)
+
     if args.pdb:
         # set the pdb_hook as the except hook for all exceptions
         def pdb_hook(exctype, value, traceback):
