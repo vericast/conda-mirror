@@ -1,6 +1,5 @@
 import argparse
 import bz2
-from collections import defaultdict
 import hashlib
 import json
 import logging
@@ -244,12 +243,14 @@ def _parse_and_format_args():
         'num_threads': args.num_threads,
         'blacklist': blacklist,
         'whitelist': whitelist
-
     }
 
 
 def cli():
+    """Thin wrapper around parsing the cli args and calling main with them
+    """
     main(**_parse_and_format_args())
+
 
 def _remove_package(pkg_path, reason):
     """
@@ -399,6 +400,15 @@ def _validate_packages(package_repodata, package_directory, num_threads=1):
         Number of concurrent processes to use. Set to `0` to use a number of
         processes equal to the number of cores in the system. Defaults to `1`
         (i.e. serial package validation).
+
+    Returns
+    -------
+    list
+        Iterable of twoples of (pkg_path, reason) where
+        pkg_path : str
+            The full path to the package that is being removed
+        reason : str
+            The reason why the package is being removed
     """
     # validate local conda packages
     local_packages = _list_conda_packages(package_directory)
@@ -411,13 +421,14 @@ def _validate_packages(package_repodata, package_directory, num_threads=1):
                          for num, package in enumerate(sorted(local_packages))]
 
     if num_threads is 1 or num_threads is None:
+        # Do serial package validation (Takes a long time for large repos)
         validation_results = map(_validate_or_remove_package,
                                  val_func_arg_list)
     else:
         if num_threads is 0:
-            logger.debug('`num_threads=0` will be replaced by num of all '
-                         'available cores')
             num_threads = os.cpu_count()
+            logger.debug('num_threads=0 so it will be replaced by all available '
+                         'cores: %s' % num_threads)
         logger.info('Will use {} threads for package validation.'
                     ''.format(num_threads))
         p = multiprocessing.Pool(num_threads)
@@ -427,7 +438,6 @@ def _validate_packages(package_repodata, package_directory, num_threads=1):
         p.join()
 
     return validation_results
-
 
 
 def _validate_or_remove_package(args):
@@ -559,8 +569,9 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # 7. copy new packages to repo directory
     # 8. download repodata.json and repodata.json.bz2
     # 9. copy new repodata.json and repodata.json.bz2 into the repo
-    summary = defaultdict(set)
-
+    summary = {'validating-existing': set(),
+               'validating-new': set(),
+               'downloaded': set()}
     # Implementation:
     if not os.path.exists(os.path.join(target_directory, platform)):
         os.makedirs(os.path.join(target_directory, platform))
@@ -579,30 +590,22 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     whitelist_packages = {}
     # match blacklist conditions
     if blacklist:
-        logger.debug("blacklist")
         blacklist_packages = {}
         for blist in blacklist:
             matched_packages = _match(packages, blist)
             blacklist_packages.update(matched_packages)
-        logger.debug(pformat(sorted(blacklist_packages)))
 
     # 3. un-blacklist packages that are actually whitelisted
     # match whitelist on blacklist
     if whitelist:
-        logger.debug("whitelist")
         whitelist_packages = {}
         for wlist in whitelist:
             matched_packages = _match(packages, wlist)
             whitelist_packages.update(matched_packages)
-        logger.debug(pformat(sorted(whitelist_packages)))
     # make final mirror list of not-blacklist + whitelist
     true_blacklist = set(blacklist_packages.keys()) - set(
         whitelist_packages.keys())
-    logger.debug('true blacklist')
-    logger.debug(pformat(sorted(whitelist_packages)))
     possible_packages_to_mirror = set(packages.keys()) - true_blacklist
-    logger.debug('possible_packages_to_mirror')
-    logger.debug(pformat(sorted(possible_packages_to_mirror)))
 
     # 4. Validate all local packages
     # construct the desired package repodata
@@ -610,8 +613,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                         for pkgname in possible_packages_to_mirror}
 
     validation_results = _validate_packages(desired_repodata, local_directory, num_threads)
-    summary['validation'].update(validation_results)
-
+    summary['validating-existing'].update(validation_results)
     # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
     # mirror list
@@ -634,21 +636,20 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                 platform=platform,
                 file_name=package_name)
             _download(url, download_dir)
-            summary['download'].add((url, download_dir))
+            summary['downloaded'].add((url, download_dir))
 
         # validate all packages in the download directory
         validation_results = _validate_packages(packages, download_dir,
                                                 num_threads=num_threads)
-        summary['validation'].update(validation_results)
-        logger.debug('contents of %s are %s',
+        summary['validating-new'].update(validation_results)
+        logger.debug('Newly downloaded files at %s are %s',
                      download_dir,
                      pformat(os.listdir(download_dir)))
 
         # 8. Use already downloaded repodata.json contents but prune it of
         # packages we don't want
-        repodata_path = os.path.join(download_dir, 'repodata.json')
-
         repodata = {'info': info, 'packages': packages}
+
         # compute the packages that we have locally
         packages_we_have = set(local_packages +
                                _list_conda_packages(download_dir))
