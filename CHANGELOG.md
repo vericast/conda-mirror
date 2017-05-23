@@ -1,8 +1,17 @@
 # Change Log
 
-## [Unreleased](https://github.com/maxpoint/conda-mirror/tree/HEAD)
+## [0.7.1](https://github.com/maxpoint/conda-mirror/tree/0.7.2) (2017-05-23)
 
-[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.7.0...HEAD)
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.7.1...0.7.2.)
+
+**Merged pull requests:**
+
+- Modify run summary. Configure flake8 on travis [\#53](https://github.com/maxpoint/conda-mirror/pull/53) ([ericdill](https://github.com/ericdill))
+- MNT: Template out the message [\#52](https://github.com/maxpoint/conda-mirror/pull/52) ([ericdill](https://github.com/ericdill))
+- Raise don't exit when required args aren't present [\#51](https://github.com/maxpoint/conda-mirror/pull/51) ([ericdill](https://github.com/ericdill))
+
+## [0.7.1](https://github.com/maxpoint/conda-mirror/tree/0.7.1) (2017-05-18)
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.7.0...0.7.1)
 
 **Merged pull requests:**
 
