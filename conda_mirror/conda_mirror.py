@@ -267,8 +267,8 @@ def _remove_package(pkg_path, reason):
     reason : str
         The reason why the package is being removed
     """
-    msg = "Removing: %s. Reason: %s"
-    logger.warning(msg, pkg_path, reason)
+    msg = "Removing: %s. Reason: %s" % (pkg_path, reason)
+    logger.warning(msg)
     os.remove(pkg_path)
     return pkg_path, msg
 
