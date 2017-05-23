@@ -194,3 +194,19 @@ TOTAL                            239     20    92%
 
 After a new contributor makes a pull-request that is approved, we will reach out
 and invite you to be a maintainer of the project.
+
+
+## Releasing
+
+To release you need three things
+
+1. Commit rights to conda-mirror
+2. A github token
+3. The version number that you want to use for the new tag
+
+After you have all three of these things, run the release.sh script (on a unix machine) and
+pass it the tag that you want to use and your github token:
+
+```bash
+./release.sh <tag> <github_token>
+```
