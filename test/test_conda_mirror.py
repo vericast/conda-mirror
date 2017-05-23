@@ -40,8 +40,8 @@ def test_version():
     sys.argv = old_args
 
 
-def _get_smallest_package(packages):
-    return sorted(packages, key=lambda x: packages[x]['size'])[0]
+def _get_smallest_packages(packages, num=1):
+    return sorted(packages, key=lambda x: packages[x]['size'])[:num]
 
 
 @pytest.mark.parametrize(
@@ -50,7 +50,7 @@ def _get_smallest_package(packages):
 @pytest.mark.parametrize('num_threads', [0, 1, 4])
 def test_cli(tmpdir, channel, platform, repodata, num_threads):
     info, packages = repodata[channel]
-    smallest_package = _get_smallest_package(packages)
+    smallest_package, = _get_smallest_packages(packages)
     # drop the html stuff. get just the channel
 
     f2 = tmpdir.mkdir(channel.rsplit('/', 1)[-1])
@@ -129,7 +129,7 @@ def test_main(tmpdir, repodata):
     target_directory = tmpdir.mkdir(platform)
     temp_directory = tmpdir.mkdir(join(platform, 'temp'))
     info, packages = repodata[channel]
-    smallest_package = _get_smallest_package(packages)
+    smallest_package, next_smallest_package = _get_smallest_packages(packages, num=2)
 
     ret = conda_mirror.main(
         upstream_channel=channel,
@@ -140,5 +140,21 @@ def test_main(tmpdir, repodata):
         whitelist=[{'name': packages[smallest_package]['name'],
                     'version': packages[smallest_package]['version']}])
 
-    assert len(ret['download']) > 0, "We should have downloaded at least one package"
-    assert len(ret['validation']) > 0, "We should have validated at least one package"
+    assert len(ret['validating-existing']) == 0, "There should be no already-downloaded packages"
+    validated_all_downloads = len(ret['downloaded']) == len(ret['validating-new'])
+    assert validated_all_downloads, "We should have downloaded at least one package"
+    previously_downloaded_packages = len(ret['downloaded'])
+
+    ret = conda_mirror.main(
+        upstream_channel=channel,
+        target_directory=target_directory.strpath,
+        temp_directory=temp_directory.strpath,
+        platform='linux-64',
+        blacklist=[{'name': '*'}],
+        whitelist=[{'name': packages[next_smallest_package]['name'],
+                    'version': packages[next_smallest_package]['version']}])
+
+    msg = "We should have %s packages downloaded now" % previously_downloaded_packages
+    assert len(ret['validating-existing']) == previously_downloaded_packages, msg
+    validated_all_downloads = len(ret['downloaded']) == len(ret['validating-new'])
+    assert validated_all_downloads, "We should have downloaded at least one package"
