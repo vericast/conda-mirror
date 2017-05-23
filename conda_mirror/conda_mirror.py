@@ -244,12 +244,13 @@ def _parse_and_format_args():
         'num_threads': args.num_threads,
         'blacklist': blacklist,
         'whitelist': whitelist
-
     }
 
 
 def cli():
+    """Thin wrapper around parsing the cli args and calling main with them"""
     main(**_parse_and_format_args())
+
 
 def _remove_package(pkg_path, reason):
     """
@@ -427,7 +428,6 @@ def _validate_packages(package_repodata, package_directory, num_threads=1):
         p.join()
 
     return validation_results
-
 
 
 def _validate_or_remove_package(args):
@@ -610,7 +610,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                         for pkgname in possible_packages_to_mirror}
 
     validation_results = _validate_packages(desired_repodata, local_directory, num_threads)
-    summary['validation'].update(validation_results)
+    summary['validating-existing'].update(validation_results)
 
     # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
@@ -634,21 +634,20 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                 platform=platform,
                 file_name=package_name)
             _download(url, download_dir)
-            summary['download'].add((url, download_dir))
+            summary['downloaded'].add((url, download_dir))
 
         # validate all packages in the download directory
         validation_results = _validate_packages(packages, download_dir,
                                                 num_threads=num_threads)
-        summary['validation'].update(validation_results)
+        summary['validating-new'].update(validation_results)
         logger.debug('contents of %s are %s',
                      download_dir,
                      pformat(os.listdir(download_dir)))
 
         # 8. Use already downloaded repodata.json contents but prune it of
         # packages we don't want
-        repodata_path = os.path.join(download_dir, 'repodata.json')
-
         repodata = {'info': info, 'packages': packages}
+
         # compute the packages that we have locally
         packages_we_have = set(local_packages +
                                _list_conda_packages(download_dir))
