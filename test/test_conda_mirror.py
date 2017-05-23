@@ -142,5 +142,3 @@ def test_main(tmpdir, repodata):
 
     assert len(ret['download']) > 0, "We should have downloaded at least one package"
     assert len(ret['validation']) > 0, "We should have validated at least one package"
-
-
