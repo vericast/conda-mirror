@@ -1,7 +1,6 @@
 # Change Log
 
-## [0.7.3](https://github.com/maxpoint/conda-mirror/tree/0.7.3)
-
+## [0.7.3](https://github.com/maxpoint/conda-mirror/tree/0.7.3) (2017-08-07)
 [Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.7.2...0.7.3)
 
 **Fixed bugs:**
