@@ -1,5 +1,23 @@
 # Change Log
 
+## [0.7.3](https://github.com/maxpoint/conda-mirror/tree/0.7.3)
+
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.7.2...0.7.3)
+
+**Fixed bugs:**
+
+- keep old packages [\#56](https://github.com/maxpoint/conda-mirror/issues/56)
+
+**Closed issues:**
+
+- Validation errors caused by incomplete tar file [\#57](https://github.com/maxpoint/conda-mirror/issues/57)
+
+**Merged pull requests:**
+
+- Handle EOFError when reading tar files. [\#58](https://github.com/maxpoint/conda-mirror/pull/58) ([dmkent](https://github.com/dmkent))
+- Add release script that edits the output of github\_changelog\_generator [\#55](https://github.com/maxpoint/conda-mirror/pull/55) ([ericdill](https://github.com/ericdill))
+- DOC: Rerun changelog generator [\#54](https://github.com/maxpoint/conda-mirror/pull/54) ([ericdill](https://github.com/ericdill))
+
 ## [0.7.2](https://github.com/maxpoint/conda-mirror/tree/0.7.2) (2017-05-23)
 [Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.7.1...0.7.2)
 
