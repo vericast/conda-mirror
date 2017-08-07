@@ -2,7 +2,10 @@
 # Ready to release
 
 NEW_TAG=${1?Need a tag}
-GITHUB_TOKEN=${2?Need a github token}
+if [[ -z $GITHUB_TOKEN ]]; then
+    echo "Need to set GITHUB_TOKEN environmental variable before calling this script"
+    exit 1
+fi
 
 # Generate the new changelog:
 github_changelog_generator -t ${GITHUB_TOKEN}
