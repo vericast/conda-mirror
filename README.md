@@ -26,11 +26,13 @@ or:
 CLI interface for `conda-mirror.py`
 
 ```
-$ conda-mirror -h
 usage: conda-mirror [-h] [--upstream-channel UPSTREAM_CHANNEL]
                     [--target-directory TARGET_DIRECTORY]
                     [--temp-directory TEMP_DIRECTORY] [--platform PLATFORM]
-                    [-v] [--config CONFIG] [--pdb] [--version]
+                    [-v] [--config CONFIG] [--pdb] [--num-threads NUM_THREADS]
+                    [--version]
+
+CLI interface for conda-mirror.py
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -53,6 +55,9 @@ optional arguments:
                         debug.
   --config CONFIG       Path to the yaml config file
   --pdb                 Enable PDB debugging on exception
+  --num-threads NUM_THREADS
+                        Num of threads for validation. 1: Serial mode. 0: All
+                        available.
   --version             Print version and quit
 ```
 
@@ -208,5 +213,5 @@ After you have all three of these things, run the release.sh script (on a unix m
 pass it the tag that you want to use and your github token:
 
 ```bash
-./release.sh <tag> <github_token>
+GITHUB_TOKEN=<github_token> ./release.sh <tag>
 ```
