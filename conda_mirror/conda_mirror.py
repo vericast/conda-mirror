@@ -301,7 +301,7 @@ def _validate(filename, md5=None, size=None):
     try:
         t = tarfile.open(filename)
         t.extractfile('info/index.json').read().decode('utf-8')
-    except tarfile.TarError:
+    except (tarfile.TarError, EOFError):
         logger.info("Validation failed because conda package is corrupted.",
                     exc_info=True)
         return _remove_package(filename, reason="Tarfile read failure")
