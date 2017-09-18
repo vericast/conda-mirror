@@ -239,9 +239,10 @@ def _parse_and_format_args():
         with open(args.config, 'r') as f:
             config_dict = yaml.load(f)
         logger.info("config: %s", config_dict)
+
     blacklist = config_dict.get('blacklist')
     whitelist = config_dict.get('whitelist')
-
+    
     return {
         'upstream_channel': args.upstream_channel,
         'target_directory': args.target_directory,
@@ -249,7 +250,8 @@ def _parse_and_format_args():
         'platform': args.platform,
         'num_threads': args.num_threads,
         'blacklist': blacklist,
-        'whitelist': whitelist
+        'whitelist': whitelist,
+        'dry_run': args.dry_run,
     }
 
 
@@ -345,8 +347,16 @@ def get_repodata(channel, platform):
     url_template, channel = _maybe_split_channel(channel)
     url = url_template.format(channel=channel, platform=platform,
                               file_name='repodata.json')
-    json = requests.get(url).json()
-    return json.get('info', {}), json.get('packages', {})
+
+    resp = requests.get(url).json()
+    info = resp.get('info', {})
+    packages = resp.get('packages', {})
+    # Patch the repodata.json so that all package info dicts contain a "subdir" key.
+    # Apparently some channels on anaconda.org do not contain the 'subdir' field. I
+    # this this might be relegated to the Continuum-provided channels only, actually.
+    for pkg_name, pkg_info in packages.items():
+        pkg_info.setdefault('subdir', platform)
+    return info, packages
 
 
 def _download(url, target_directory):
@@ -607,7 +617,9 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     if blacklist:
         blacklist_packages = {}
         for blist in blacklist:
+            logger.debug('blacklist item: %s', blist)
             matched_packages = _match(packages, blist)
+            logger.debug(pformat(list(matched_packages.keys())))
             blacklist_packages.update(matched_packages)
 
     # 3. un-blacklist packages that are actually whitelisted
