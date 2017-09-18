@@ -172,6 +172,13 @@ def _make_arg_parser():
         help="Print version and quit",
         default=False,
     )
+    ap.add_argument(
+        '--dry-run',
+        action="store_true",
+        help=("Show what will be downloaded and what will be removed. Will not "
+              "validate existing packages"),
+        default=False
+    )
     return ap
 
 
@@ -487,7 +494,7 @@ def _validate_or_remove_package(args):
 
 
 def main(upstream_channel, target_directory, temp_directory, platform,
-         blacklist=None, whitelist=None, num_threads=1):
+         blacklist=None, whitelist=None, num_threads=1, dry_run=False):
     """
 
     Parameters
@@ -508,18 +515,22 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         The platform that you wish to mirror for. Common options are
         'linux-64', 'osx-64', 'win-64' and 'win-32'. Any platform is valid as
         long as the url resolves.
-    blacklist : iterable of tuples
+    blacklist : iterable of tuples, optional
         The values of blacklist should be (key, glob) where key is one of the
         keys in the repodata['packages'] dicts and glob is a thing to match
         on.  Note that all comparisons will be laundered through lowercasing.
-    whitelist : iterable of tuples
+    whitelist : iterable of tuples, optional
         The values of blacklist should be (key, glob) where key is one of the
         keys in the repodata['packages'] dicts and glob is a thing to match
         on.  Note that all comparisons will be laundered through lowercasing.
-    num_threads : int
+    num_threads : int, optional
         Number of threads to be used for concurrent validation.  Defaults to
         `num_threads=1` for non-concurrent mode.  To use all available cores,
         set `num_threads=0`.
+    dry_run : bool, optional
+        Defaults to False.
+        If True, skip validation and exit after determining what needs to be
+        downloaded and what needs to be removed.
 
     Returns
     -------
@@ -569,9 +580,13 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # 7. copy new packages to repo directory
     # 8. download repodata.json and repodata.json.bz2
     # 9. copy new repodata.json and repodata.json.bz2 into the repo
-    summary = {'validating-existing': set(),
-               'validating-new': set(),
-               'downloaded': set()}
+    summary = {
+        'validating-existing': set(),
+        'validating-new': set(),
+        'downloaded': set(),
+        'blacklisted': set(),
+        'to-mirror': set()
+    }
     # Implementation:
     if not os.path.exists(os.path.join(target_directory, platform)):
         os.makedirs(os.path.join(target_directory, platform))
@@ -605,22 +620,30 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # make final mirror list of not-blacklist + whitelist
     true_blacklist = set(blacklist_packages.keys()) - set(
         whitelist_packages.keys())
+    summary['blacklisted'].update(true_blacklist)
+    logger.info("BLACKLISTED PACKAGES")
+    logger.info(pformat(true_blacklist))
     possible_packages_to_mirror = set(packages.keys()) - true_blacklist
 
     # 4. Validate all local packages
     # construct the desired package repodata
     desired_repodata = {pkgname: packages[pkgname]
                         for pkgname in possible_packages_to_mirror}
-
-    validation_results = _validate_packages(desired_repodata, local_directory, num_threads)
-    summary['validating-existing'].update(validation_results)
+    if not dry_run:
+        # Only validate if we're not doing a dry-run
+        validation_results = _validate_packages(desired_repodata, local_directory, num_threads)
+        summary['validating-existing'].update(validation_results)
     # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
     # mirror list
     local_packages = _list_conda_packages(local_directory)
     to_mirror = possible_packages_to_mirror - set(local_packages)
-    logger.info('to_mirror')
+    logger.info('PACKAGES TO MIRROR')
     logger.info(pformat(sorted(to_mirror)))
+    summary['to-mirror'].update(to_mirror)
+    if dry_run:
+        logger.info("Dry run complete. Exiting")
+        return summary
 
     # 6. for each download:
     # a. download to temp file
