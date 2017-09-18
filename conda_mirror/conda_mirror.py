@@ -1,5 +1,6 @@
 import argparse
 import bz2
+import fnmatch
 import hashlib
 import json
 import logging
@@ -10,7 +11,6 @@ import shutil
 import sys
 import tarfile
 import tempfile
-import fnmatch
 from pprint import pformat
 
 import requests
@@ -242,7 +242,7 @@ def _parse_and_format_args():
 
     blacklist = config_dict.get('blacklist')
     whitelist = config_dict.get('whitelist')
-    
+
     return {
         'upstream_channel': args.upstream_channel,
         'target_directory': args.target_directory,

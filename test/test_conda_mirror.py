@@ -3,12 +3,14 @@ import copy
 import itertools
 import json
 import os
-from os.path import join
 import sys
+
+from os.path import join
+
+from conda_mirror import conda_mirror
 
 import pytest
 
-from conda_mirror import conda_mirror
 
 anaconda_channel = 'https://repo.continuum.io/pkgs/free'
 
