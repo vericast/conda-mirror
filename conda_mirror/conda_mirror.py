@@ -621,8 +621,19 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     true_blacklist = set(blacklist_packages.keys()) - set(
         whitelist_packages.keys())
     summary['blacklisted'].update(true_blacklist)
+
     logger.info("BLACKLISTED PACKAGES")
     logger.info(pformat(true_blacklist))
+
+    # Get a list of all packages in the local mirror
+    if dry_run:
+        local_packages = _list_conda_packages(local_directory)
+        packages_slated_for_removal = [
+            pkg_name for pkg_name in local_packages if pkg_name in summary['blacklisted']
+        ]
+        logger.info("PACKAGES TO BE REMOVED")
+        logger.info(pformat(packages_slated_for_removal))
+
     possible_packages_to_mirror = set(packages.keys()) - true_blacklist
 
     # 4. Validate all local packages
