@@ -1,7 +1,18 @@
 # Change Log
 
-## [0.7.3](https://github.com/maxpoint/conda-mirror/tree/0.7.3)
+## [0.7.4](https://github.com/maxpoint/conda-mirror/tree/0.7.4)
 
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.7.3...0.7.4)
+
+**Implemented enhancements:**
+
+- Add a --dry-run mode [\#39](https://github.com/maxpoint/conda-mirror/issues/39)
+
+**Merged pull requests:**
+
+- ENH: First pass at dry-run [\#59](https://github.com/maxpoint/conda-mirror/pull/59) ([ericdill](https://github.com/ericdill))
+
+## [0.7.3](https://github.com/maxpoint/conda-mirror/tree/0.7.3) (2017-08-07)
 [Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.7.2...0.7.3)
 
 **Fixed bugs:**
