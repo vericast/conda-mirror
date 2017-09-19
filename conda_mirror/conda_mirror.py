@@ -351,9 +351,10 @@ def get_repodata(channel, platform):
     resp = requests.get(url).json()
     info = resp.get('info', {})
     packages = resp.get('packages', {})
-    # Patch the repodata.json so that all package info dicts contain a "subdir" key.
-    # Apparently some channels on anaconda.org do not contain the 'subdir' field. I
-    # this this might be relegated to the Continuum-provided channels only, actually.
+    # Patch the repodata.json so that all package info dicts contain a "subdir"
+    # key.  Apparently some channels on anaconda.org do not contain the
+    # 'subdir' field. I think this this might be relegated to the
+    # Continuum-provided channels only, actually.
     for pkg_name, pkg_info in packages.items():
         pkg_info.setdefault('subdir', platform)
     return info, packages
