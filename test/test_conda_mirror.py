@@ -3,12 +3,14 @@ import copy
 import itertools
 import json
 import os
-from os.path import join
 import sys
+
+from os.path import join
+
+from conda_mirror import conda_mirror
 
 import pytest
 
-from conda_mirror import conda_mirror
 
 anaconda_channel = 'https://repo.continuum.io/pkgs/free'
 
@@ -135,7 +137,7 @@ def test_main(tmpdir, repodata):
         upstream_channel=channel,
         target_directory=target_directory.strpath,
         temp_directory=temp_directory.strpath,
-        platform='linux-64',
+        platform=platform,
         blacklist=[{'name': '*'}],
         whitelist=[{'name': packages[smallest_package]['name'],
                     'version': packages[smallest_package]['version']}])
@@ -149,7 +151,7 @@ def test_main(tmpdir, repodata):
         upstream_channel=channel,
         target_directory=target_directory.strpath,
         temp_directory=temp_directory.strpath,
-        platform='linux-64',
+        platform=platform,
         blacklist=[{'name': '*'}],
         whitelist=[{'name': packages[next_smallest_package]['name'],
                     'version': packages[next_smallest_package]['version']}])
@@ -158,3 +160,18 @@ def test_main(tmpdir, repodata):
     assert len(ret['validating-existing']) == previously_downloaded_packages, msg
     validated_all_downloads = len(ret['downloaded']) == len(ret['validating-new'])
     assert validated_all_downloads, "We should have downloaded at least one package"
+
+
+def test_dry_run_dumb(tmpdir):
+    platform = 'linux-64'
+    channel = 'conda-forge'
+    target_directory = tmpdir.mkdir(platform)
+    temp_directory = tmpdir.mkdir(join(platform, 'temp'))
+    ret = conda_mirror.main(
+        upstream_channel=channel,
+        platform=platform,
+        target_directory=target_directory.strpath,
+        temp_directory=temp_directory.strpath,
+        dry_run=True
+    )
+    assert len(ret['to-mirror']) > 1, "We should have a great deal of packages slated to download"

@@ -1,5 +1,6 @@
 import argparse
 import bz2
+import fnmatch
 import hashlib
 import json
 import logging
@@ -10,7 +11,6 @@ import shutil
 import sys
 import tarfile
 import tempfile
-import fnmatch
 from pprint import pformat
 
 import requests
@@ -172,6 +172,13 @@ def _make_arg_parser():
         help="Print version and quit",
         default=False,
     )
+    ap.add_argument(
+        '--dry-run',
+        action="store_true",
+        help=("Show what will be downloaded and what will be removed. Will not "
+              "validate existing packages"),
+        default=False
+    )
     return ap
 
 
@@ -232,6 +239,7 @@ def _parse_and_format_args():
         with open(args.config, 'r') as f:
             config_dict = yaml.load(f)
         logger.info("config: %s", config_dict)
+
     blacklist = config_dict.get('blacklist')
     whitelist = config_dict.get('whitelist')
 
@@ -242,7 +250,8 @@ def _parse_and_format_args():
         'platform': args.platform,
         'num_threads': args.num_threads,
         'blacklist': blacklist,
-        'whitelist': whitelist
+        'whitelist': whitelist,
+        'dry_run': args.dry_run,
     }
 
 
@@ -338,8 +347,17 @@ def get_repodata(channel, platform):
     url_template, channel = _maybe_split_channel(channel)
     url = url_template.format(channel=channel, platform=platform,
                               file_name='repodata.json')
-    json = requests.get(url).json()
-    return json.get('info', {}), json.get('packages', {})
+
+    resp = requests.get(url).json()
+    info = resp.get('info', {})
+    packages = resp.get('packages', {})
+    # Patch the repodata.json so that all package info dicts contain a "subdir"
+    # key.  Apparently some channels on anaconda.org do not contain the
+    # 'subdir' field. I think this this might be relegated to the
+    # Continuum-provided channels only, actually.
+    for pkg_name, pkg_info in packages.items():
+        pkg_info.setdefault('subdir', platform)
+    return info, packages
 
 
 def _download(url, target_directory):
@@ -487,7 +505,7 @@ def _validate_or_remove_package(args):
 
 
 def main(upstream_channel, target_directory, temp_directory, platform,
-         blacklist=None, whitelist=None, num_threads=1):
+         blacklist=None, whitelist=None, num_threads=1, dry_run=False):
     """
 
     Parameters
@@ -508,18 +526,22 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         The platform that you wish to mirror for. Common options are
         'linux-64', 'osx-64', 'win-64' and 'win-32'. Any platform is valid as
         long as the url resolves.
-    blacklist : iterable of tuples
+    blacklist : iterable of tuples, optional
         The values of blacklist should be (key, glob) where key is one of the
         keys in the repodata['packages'] dicts and glob is a thing to match
         on.  Note that all comparisons will be laundered through lowercasing.
-    whitelist : iterable of tuples
+    whitelist : iterable of tuples, optional
         The values of blacklist should be (key, glob) where key is one of the
         keys in the repodata['packages'] dicts and glob is a thing to match
         on.  Note that all comparisons will be laundered through lowercasing.
-    num_threads : int
+    num_threads : int, optional
         Number of threads to be used for concurrent validation.  Defaults to
         `num_threads=1` for non-concurrent mode.  To use all available cores,
         set `num_threads=0`.
+    dry_run : bool, optional
+        Defaults to False.
+        If True, skip validation and exit after determining what needs to be
+        downloaded and what needs to be removed.
 
     Returns
     -------
@@ -569,9 +591,13 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # 7. copy new packages to repo directory
     # 8. download repodata.json and repodata.json.bz2
     # 9. copy new repodata.json and repodata.json.bz2 into the repo
-    summary = {'validating-existing': set(),
-               'validating-new': set(),
-               'downloaded': set()}
+    summary = {
+        'validating-existing': set(),
+        'validating-new': set(),
+        'downloaded': set(),
+        'blacklisted': set(),
+        'to-mirror': set()
+    }
     # Implementation:
     if not os.path.exists(os.path.join(target_directory, platform)):
         os.makedirs(os.path.join(target_directory, platform))
@@ -592,7 +618,9 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     if blacklist:
         blacklist_packages = {}
         for blist in blacklist:
+            logger.debug('blacklist item: %s', blist)
             matched_packages = _match(packages, blist)
+            logger.debug(pformat(list(matched_packages.keys())))
             blacklist_packages.update(matched_packages)
 
     # 3. un-blacklist packages that are actually whitelisted
@@ -605,22 +633,41 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # make final mirror list of not-blacklist + whitelist
     true_blacklist = set(blacklist_packages.keys()) - set(
         whitelist_packages.keys())
+    summary['blacklisted'].update(true_blacklist)
+
+    logger.info("BLACKLISTED PACKAGES")
+    logger.info(pformat(true_blacklist))
+
+    # Get a list of all packages in the local mirror
+    if dry_run:
+        local_packages = _list_conda_packages(local_directory)
+        packages_slated_for_removal = [
+            pkg_name for pkg_name in local_packages if pkg_name in summary['blacklisted']
+        ]
+        logger.info("PACKAGES TO BE REMOVED")
+        logger.info(pformat(packages_slated_for_removal))
+
     possible_packages_to_mirror = set(packages.keys()) - true_blacklist
 
     # 4. Validate all local packages
     # construct the desired package repodata
     desired_repodata = {pkgname: packages[pkgname]
                         for pkgname in possible_packages_to_mirror}
-
-    validation_results = _validate_packages(desired_repodata, local_directory, num_threads)
-    summary['validating-existing'].update(validation_results)
+    if not dry_run:
+        # Only validate if we're not doing a dry-run
+        validation_results = _validate_packages(desired_repodata, local_directory, num_threads)
+        summary['validating-existing'].update(validation_results)
     # 5. figure out final list of packages to mirror
     # do the set difference of what is local and what is in the final
     # mirror list
     local_packages = _list_conda_packages(local_directory)
     to_mirror = possible_packages_to_mirror - set(local_packages)
-    logger.info('to_mirror')
+    logger.info('PACKAGES TO MIRROR')
     logger.info(pformat(sorted(to_mirror)))
+    summary['to-mirror'].update(to_mirror)
+    if dry_run:
+        logger.info("Dry run complete. Exiting")
+        return summary
 
     # 6. for each download:
     # a. download to temp file
