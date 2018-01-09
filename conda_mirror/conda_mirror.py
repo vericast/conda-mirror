@@ -115,7 +115,7 @@ def _make_arg_parser():
         The instantiated argument parser for this CLI
     """
     ap = argparse.ArgumentParser(
-        description="CLI interface for conda-mirror.py")
+        description="CLI interface for conda-mirror")
 
     ap.add_argument(
         '--upstream-channel',
@@ -147,6 +147,11 @@ def _make_arg_parser():
         help=("logging defaults to error/exception only. Takes up to three "
               "'-v' flags. '-v': warning. '-vv': info. '-vvv': debug."),
         default=0,
+    )
+    ap.add_argument(
+        '--no-validation',
+        action="store_true",
+        help="Don't validate binaries in the channel (size/md5/etc.)",
     )
     ap.add_argument(
         '--config',
@@ -252,6 +257,7 @@ def _parse_and_format_args():
         'blacklist': blacklist,
         'whitelist': whitelist,
         'dry_run': args.dry_run,
+        'validate': not args.no_validation
     }
 
 
@@ -505,7 +511,8 @@ def _validate_or_remove_package(args):
 
 
 def main(upstream_channel, target_directory, temp_directory, platform,
-         blacklist=None, whitelist=None, num_threads=1, dry_run=False):
+         blacklist=None, whitelist=None, num_threads=1, dry_run=False,
+         validate=True):
     """
 
     Parameters
@@ -542,6 +549,9 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         Defaults to False.
         If True, skip validation and exit after determining what needs to be
         downloaded and what needs to be removed.
+    validate : bool, optional
+        Defaults to True.
+        If False, don't check the size/md5 of the downloaded binaries.
 
     Returns
     -------
@@ -653,8 +663,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # construct the desired package repodata
     desired_repodata = {pkgname: packages[pkgname]
                         for pkgname in possible_packages_to_mirror}
-    if not dry_run:
-        # Only validate if we're not doing a dry-run
+    if not dry_run and validate:
+        # Only validate if we're not doing a dry-run (and we want validation)
         validation_results = _validate_packages(desired_repodata, local_directory, num_threads)
         summary['validating-existing'].update(validation_results)
     # 5. figure out final list of packages to mirror
@@ -685,10 +695,11 @@ def main(upstream_channel, target_directory, temp_directory, platform,
             _download(url, download_dir)
             summary['downloaded'].add((url, download_dir))
 
-        # validate all packages in the download directory
-        validation_results = _validate_packages(packages, download_dir,
-                                                num_threads=num_threads)
-        summary['validating-new'].update(validation_results)
+        if validate:
+            # validate all packages in the download directory
+            validation_results = _validate_packages(packages, download_dir,
+                                                    num_threads=num_threads)
+            summary['validating-new'].update(validation_results)
         logger.debug('Newly downloaded files at %s are %s',
                      download_dir,
                      pformat(os.listdir(download_dir)))
