@@ -15,6 +15,7 @@ setup(
     install_requires=[
         'requests',
         'pyyaml',
+        'justbackoff'
     ],
     entry_points={
         "console_scripts": [

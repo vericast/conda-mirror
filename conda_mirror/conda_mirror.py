@@ -12,6 +12,8 @@ import sys
 import tarfile
 import tempfile
 from pprint import pformat
+import time
+from justbackoff import Backoff
 
 import requests
 import yaml
@@ -165,7 +167,7 @@ def _make_arg_parser():
         default=1,
         type=int,
         help="Num of threads for validation. 1: Serial mode. 0: All available."
-        )
+    )
     ap.add_argument(
         '--version',
         action="store_true",
@@ -179,6 +181,25 @@ def _make_arg_parser():
               "validate existing packages"),
         default=False
     )
+
+    ap.add_argument(
+        '--retry-download',
+        action="store",
+        default=7,
+        type=int,
+        help=("Number of retry of file download using exponential backoff time. " 
+            "Default is 7 attempts.")
+    )
+
+    ap.add_argument(
+        '--no-jitter',
+        action="store_true",
+        help=("Do not use jitter in backoff sleep time. "  
+            "If not specified jitter is used."),
+        default=False
+    )
+
+
     return ap
 
 
@@ -225,7 +246,9 @@ def _parse_and_format_args():
 
     for required in ('target_directory', 'platform', 'upstream_channel'):
         if not getattr(args, required):
-            raise ValueError("Missing command line argument: %s", required)
+            parser.print_help()
+            print("Missing command line argument: {}".format(required), file=sys.stderr)
+            return
 
     if args.pdb:
         # set the pdb_hook as the except hook for all exceptions
@@ -252,13 +275,16 @@ def _parse_and_format_args():
         'blacklist': blacklist,
         'whitelist': whitelist,
         'dry_run': args.dry_run,
+        'num_download_attempts' : args.retry_download,
+        'jitter' : not args.no_jitter
     }
 
 
 def cli():
     """Thin wrapper around parsing the cli args and calling main with them
     """
-    main(**_parse_and_format_args())
+    args = _parse_and_format_args()
+    sys.exit(1) if args is None else main(**args)
 
 
 def _remove_package(pkg_path, reason):
@@ -360,7 +386,7 @@ def get_repodata(channel, platform):
     return info, packages
 
 
-def _download(url, target_directory):
+def _download(url, target_directory, attempts, jitter):
     """Download `url` to `target_directory`
 
     Parameters
@@ -370,17 +396,34 @@ def _download(url, target_directory):
     target_directory : str
         The path to a directory where `url` should be downloaded
     """
+
     chunk_size = 1024  # 1KB chunks
-    logger.info("download_url=%s", url)
     # create a temporary file
     target_filename = url.split('/')[-1]
     download_filename = os.path.join(target_directory, target_filename)
-    logger.debug('downloading to %s', download_filename)
-    with open(download_filename, 'w+b') as tf:
-        ret = requests.get(url, stream=True)
-        for data in ret.iter_content(chunk_size):
-            tf.write(data)
 
+    b = Backoff(min_ms=2000, max_ms=300000, factor=2, jitter=jitter)
+    download_ok = False
+    for secs in range(attempts):
+        try:
+            logger.info("Start downlaod of file {}".format(url))
+            logger.debug('Downloading to {}'.format(download_filename))
+            with open(download_filename, 'w+b') as tf:
+                ret = requests.get(url, stream=True)
+                for data in ret.iter_content(chunk_size):
+                    tf.write(data)
+            logger.info('File {} successfully downloaded'.format(download_filename))
+            download_ok = True
+            break
+        except Exception as ex:
+            logger.exception("Failure in network connection")
+            secs = b.duration()
+            logger.info("Wait for {} seconds".format(secs))
+            time.sleep(secs)
+            logger.info("Try download again")
+        
+    if not download_ok:
+        logger.error("After {} attempts could not download file {}".format(attempts, url))
 
 def _list_conda_packages(local_dir):
     """List the conda packages (*.tar.bz2 files) in `local_dir`
@@ -504,8 +547,17 @@ def _validate_or_remove_package(args):
                      size=package_metadata.get('size'))
 
 
-def main(upstream_channel, target_directory, temp_directory, platform,
-         blacklist=None, whitelist=None, num_threads=1, dry_run=False):
+def main(upstream_channel, 
+        target_directory, 
+        temp_directory, 
+        platform, 
+        num_download_attempts, 
+        jitter, 
+        blacklist=None,
+        whitelist=None, 
+        num_threads=1, 
+        dry_run=False
+    ):
     """
 
     Parameters
@@ -526,6 +578,10 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         The platform that you wish to mirror for. Common options are
         'linux-64', 'osx-64', 'win-64' and 'win-32'. Any platform is valid as
         long as the url resolves.
+    num_download_attempts :  int
+        Number of retry of file download using exponential backoff time. Default is 7 attempts.
+    jitter : bool
+        Add jitter to backoff sleep time.
     blacklist : iterable of tuples, optional
         The values of blacklist should be (key, glob) where key is one of the
         keys in the repodata['packages'] dicts and glob is a thing to match
@@ -682,7 +738,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                 channel=channel,
                 platform=platform,
                 file_name=package_name)
-            _download(url, download_dir)
+            _download(url, download_dir, num_download_attempts, jitter)
             summary['downloaded'].add((url, download_dir))
 
         # validate all packages in the download directory
