@@ -187,15 +187,15 @@ def _make_arg_parser():
         action="store",
         default=7,
         type=int,
-        help=("Number of retry of file download using exponential backoff time. " 
-            "Default is 7 attempts.")
+        help=("Number of retry of file download using exponential backoff time. "
+              "Default is 7 attempts.")
     )
 
     ap.add_argument(
         '--no-jitter',
         action="store_true",
-        help=("Do not use jitter in backoff sleep time. "  
-            "If not specified jitter is used."),
+        help=("Do not use jitter in backoff sleep time. "
+              "If not specified jitter is used."),
         default=False
     )
 
@@ -284,7 +284,10 @@ def cli():
     """Thin wrapper around parsing the cli args and calling main with them
     """
     args = _parse_and_format_args()
-    sys.exit(1) if args is None else main(**args)
+    if args is None:
+        sys.exit(1)
+    else:
+        main(**args)
 
 
 def _remove_package(pkg_path, reason):
@@ -406,24 +409,23 @@ def _download(url, target_directory, attempts, jitter):
     download_ok = False
     for secs in range(attempts):
         try:
-            logger.info("Start downlaod of file {}".format(url))
-            logger.debug('Downloading to {}'.format(download_filename))
+            logger.info("Start downlaod of file %s", url)
+            logger.debug('Downloading to %s', download_filename)
             with open(download_filename, 'w+b') as tf:
                 ret = requests.get(url, stream=True)
                 for data in ret.iter_content(chunk_size):
                     tf.write(data)
-            logger.info('File {} successfully downloaded'.format(download_filename))
+            logger.info('File %s successfully downloaded', download_filename)
             download_ok = True
             break
-        except Exception as ex:
+        except Exception:
             logger.exception("Failure in network connection")
             secs = b.duration()
-            logger.info("Wait for {} seconds".format(secs))
+            logger.info("Wait for %s seconds", secs)
             time.sleep(secs)
             logger.info("Try download again")
-        
     if not download_ok:
-        logger.error("After {} attempts could not download file {}".format(attempts, url))
+        logger.error("After %s attempts could not download file %s", attempts, url)
 
 def _list_conda_packages(local_dir):
     """List the conda packages (*.tar.bz2 files) in `local_dir`
@@ -488,10 +490,10 @@ def _validate_packages(package_repodata, package_directory, num_threads=1):
     else:
         if num_threads is 0:
             num_threads = os.cpu_count()
-            logger.debug('num_threads=0 so it will be replaced by all available '
-                         'cores: %s' % num_threads)
-        logger.info('Will use {} threads for package validation.'
-                    ''.format(num_threads))
+            logger.debug(
+                'num_threads=0 so it will be replaced by all available cores: %s', \
+                num_threads)
+        logger.info('Will use %s threads for package validation.', num_threads)
         p = multiprocessing.Pool(num_threads)
         validation_results = p.map(_validate_or_remove_package,
                                    val_func_arg_list)
@@ -547,17 +549,10 @@ def _validate_or_remove_package(args):
                      size=package_metadata.get('size'))
 
 
-def main(upstream_channel, 
-        target_directory, 
-        temp_directory, 
-        platform, 
-        num_download_attempts, 
-        jitter, 
-        blacklist=None,
-        whitelist=None, 
-        num_threads=1, 
-        dry_run=False
-    ):
+def main(upstream_channel, target_directory, temp_directory, \
+  platform, num_download_attempts, jitter, \
+  blacklist=None, whitelist=None, num_threads=1, \
+  dry_run=False):
     """
 
     Parameters
