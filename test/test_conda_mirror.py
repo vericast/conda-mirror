@@ -74,6 +74,8 @@ whitelist:
                 " --num-threads {num_threads}"
                 " --pdb"
                 " -vvv"
+                " --no-jitter"
+                " --retry-download 1"
                 ).format(config=f1.strpath,
                          channel=channel,
                          target_directory=f2.strpath,
@@ -138,6 +140,8 @@ def test_main(tmpdir, repodata):
         target_directory=target_directory.strpath,
         temp_directory=temp_directory.strpath,
         platform=platform,
+        jitter=False,
+        num_download_attempts=1,
         blacklist=[{'name': '*'}],
         whitelist=[{'name': packages[smallest_package]['name'],
                     'version': packages[smallest_package]['version']}])
@@ -152,6 +156,8 @@ def test_main(tmpdir, repodata):
         target_directory=target_directory.strpath,
         temp_directory=temp_directory.strpath,
         platform=platform,
+        jitter=False,
+        num_download_attempts=1,        
         blacklist=[{'name': '*'}],
         whitelist=[{'name': packages[next_smallest_package]['name'],
                     'version': packages[next_smallest_package]['version']}])
@@ -170,6 +176,8 @@ def test_dry_run_dumb(tmpdir):
     ret = conda_mirror.main(
         upstream_channel=channel,
         platform=platform,
+        jitter=False,
+        num_download_attempts=1,        
         target_directory=target_directory.strpath,
         temp_directory=temp_directory.strpath,
         dry_run=True
