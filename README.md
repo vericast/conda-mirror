@@ -148,6 +148,23 @@ blacklist:
 whitelist:
     - build: "*py3*"
 ```
+##### Mirror only some versions
+```yaml
+blacklist:
+    - name: '*'
+
+whitelist:
+  - name: yaml
+  - name: python-levenshtein
+    version: '>= 0.11.1'
+  - name: fuzzywuzzy
+    version: '>0.15.0'
+  - name: urllib3
+    version: '<1.18'
+  - name: zlib
+    version: '>=1.2.8-3'
+```
+
 
 ## Testing
 

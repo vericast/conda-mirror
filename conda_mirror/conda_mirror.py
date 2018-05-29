@@ -15,6 +15,7 @@ from pprint import pformat
 
 import requests
 import yaml
+from packaging import version
 
 logger = None
 
@@ -95,7 +96,7 @@ def _match(all_packages, key_glob_dict):
         # normalize the strings so that comparisons are easier
         for key, pattern in key_glob_dict.items():
             name = str(pkg_info.get(key, '')).lower()
-            if fnmatch.fnmatch(name, pattern):
+            if fnmatch.fnmatch(name, pattern) or _match_pattern_with_operator(name, pattern):
                 matched_all.append(True)
             else:
                 matched_all.append(False)
@@ -103,6 +104,38 @@ def _match(all_packages, key_glob_dict):
             matched.update({pkg_name: pkg_info})
 
     return matched
+
+
+def _match_pattern_with_operator(match_val, pattern):
+    """
+    To allow packages to include greater or previous versions.
+        E.g.:
+            - name: fuzzywuzzy
+              version: '>0.15.0'
+        will include fuzzywuzzy versions greater than 0.15.0
+
+    :param value: The value to match
+    :param pattern: Pattern with an operator, such as > , >=, <, <= or ==.
+    :return: Boolean - True if the value matches the pattern - e.g.:
+        9.1 > 10.2 -> False
+        1.2.2 > 1.2.1 -> True
+    """
+    vval = version.parse(match_val)
+
+    if pattern.strip().startswith('>='):
+        match = vval >= version.parse(pattern[2:].strip())
+    elif pattern.strip().startswith('<='):
+        match = vval < version.parse(pattern[2:].strip())
+    elif pattern.strip().startswith('>'):
+        match = vval > version.parse(pattern[1:].strip())
+    elif pattern.strip().startswith('<'):
+        match = vval < version.parse(pattern[1:].strip())
+    elif pattern.strip().startswith('=='):
+        match = vval == version.parse(pattern[2:].strip())
+    else:
+        match = False
+
+    return match
 
 
 def _make_arg_parser():
