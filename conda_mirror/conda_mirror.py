@@ -26,6 +26,7 @@ DEFAULT_PLATFORMS = ['linux-64',
                      'win-64',
                      'win-32']
 
+MINIMUM_FREE_SPACE_MB = 100
 
 def _maybe_split_channel(channel):
     """Split channel if it is fully qualified.
@@ -678,6 +679,10 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     with tempfile.TemporaryDirectory(dir=temp_directory) as download_dir:
         logger.info('downloading to the tempdir %s', download_dir)
         for package_name in sorted(to_mirror):
+            disk = os.statvfs(download_dir)
+            if ((disk.f_bavail * disk.f_frsize) / (1024 * 1024)) < MINIMUM_FREE_SPACE_MB:
+              logger.error('Disk space below threshold in %s. Aborting download.', download_dir)
+              break
             url = download_url.format(
                 channel=channel,
                 platform=platform,
