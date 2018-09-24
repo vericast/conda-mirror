@@ -179,6 +179,12 @@ def _make_arg_parser():
               "validate existing packages"),
         default=False
     )
+    ap.add_argument(
+        '--no-validate-target',
+        action="store_true",
+        help="Skip validation of files already present in target-directory",
+        default=False,
+    )
     return ap
 
 
@@ -252,6 +258,7 @@ def _parse_and_format_args():
         'blacklist': blacklist,
         'whitelist': whitelist,
         'dry_run': args.dry_run,
+        'no_validate_target': args.no_validate_target,
     }
 
 
@@ -505,7 +512,8 @@ def _validate_or_remove_package(args):
 
 
 def main(upstream_channel, target_directory, temp_directory, platform,
-         blacklist=None, whitelist=None, num_threads=1, dry_run=False):
+         blacklist=None, whitelist=None, num_threads=1, dry_run=False,
+         no_validate_target=False):
     """
 
     Parameters
@@ -542,6 +550,9 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         Defaults to False.
         If True, skip validation and exit after determining what needs to be
         downloaded and what needs to be removed.
+    no_validate_target : bool, optional
+        Defaults to False.
+        If True, skip validation of files already present in target_directory.
 
     Returns
     -------
@@ -653,7 +664,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # construct the desired package repodata
     desired_repodata = {pkgname: packages[pkgname]
                         for pkgname in possible_packages_to_mirror}
-    if not dry_run:
+    if not (dry_run or no_validate_target):
         # Only validate if we're not doing a dry-run
         validation_results = _validate_packages(desired_repodata, local_directory, num_threads)
         summary['validating-existing'].update(validation_results)
