@@ -26,7 +26,7 @@ DEFAULT_PLATFORMS = ['linux-64',
                      'win-64',
                      'win-32']
 
-MINIMUM_FREE_SPACE_MB = 100
+MINIMUM_FREE_SPACE_MB = 1000
 
 def _maybe_split_channel(channel):
     """Split channel if it is fully qualified.
