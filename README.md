@@ -217,3 +217,5 @@ pass it the tag that you want to use and your github token:
 ```bash
 GITHUB_TOKEN=<github_token> ./release.sh <tag>
 ```
+
+Test
