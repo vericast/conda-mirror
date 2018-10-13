@@ -683,11 +683,11 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                 platform=platform,
                 file_name=package_name)
             try:
-              _download(url, download_dir)
-              summary['downloaded'].add((url, download_dir))
-            except:
-              logger.error('Unexpected error: %s. Aborting download.', sys.exc_info()[0])
-              break
+                _download(url, download_dir)
+                summary['downloaded'].add((url, download_dir))
+            except Exception as ex:
+                logger.exception('Unexpected error %s: Aborting download', ex)
+                break
 
         # validate all packages in the download directory
         validation_results = _validate_packages(packages, download_dir,
