@@ -229,16 +229,6 @@ def _parse_and_format_args():
         print(__version__)
         sys.exit(1)
 
-    for required in ('target_directory', 'platform', 'upstream_channel'):
-        if not getattr(args, required):
-            raise ValueError("Missing command line argument: %s", required)
-
-    if args.pdb:
-        # set the pdb_hook as the except hook for all exceptions
-        def pdb_hook(exctype, value, traceback):
-            pdb.post_mortem(traceback)
-        sys.excepthook = pdb_hook
-
     config_dict = {}
     if args.config:
         logger.info("Loading config from %s", args.config)
@@ -249,16 +239,26 @@ def _parse_and_format_args():
     blacklist = config_dict.get('blacklist')
     whitelist = config_dict.get('whitelist')
 
+    for required in ('target_directory', 'platform', 'upstream_channel'):
+        if (not getattr(args, required)) and (config_dict.get(required) is None):
+            raise ValueError("Missing command line argument: %s", required)
+
+    if args.pdb or (not config_dict.get('pdb') is None):
+        # set the pdb_hook as the except hook for all exceptions
+        def pdb_hook(exctype, value, traceback):
+            pdb.post_mortem(traceback)
+        sys.excepthook = pdb_hook
+
     return {
-        'upstream_channel': args.upstream_channel,
-        'target_directory': args.target_directory,
-        'temp_directory': args.temp_directory,
-        'platform': args.platform,
-        'num_threads': args.num_threads,
+        'upstream_channel': args.upstream_channel or config_dict.get('upstream_channel'),
+        'target_directory': args.target_directory or config_dict.get('target_directory'),
+        'temp_directory': args.temp_directory or config_dict.get('temp_directory'),
+        'platform': args.platform or config_dict.get('platform'),
+        'num_threads': args.num_threads or config_dict.get('num_threads'),
         'blacklist': blacklist,
         'whitelist': whitelist,
-        'dry_run': args.dry_run,
-        'no_validate_target': args.no_validate_target,
+        'dry_run': args.dry_run or config_dict.get('dry_run'),
+        'no_validate_target': args.no_validate_target or config_dict.get('no_validate_target'),
     }
 
 
