@@ -504,7 +504,7 @@ def _validate_or_remove_package(args):
         return _remove_package(package_path, reason=reason)
     # validate the integrity of the package, the size of the package and
     # its hashes
-    logger.info('Validating {:4d} of {:4d}: {}.'.format(num, num_packages,
+    logger.info('Validating {:4d} of {:4d}: {}.'.format(num + 1, num_packages,
                                                         package))
     package_path = os.path.join(package_directory, package)
     return _validate(package_path,
