@@ -255,10 +255,10 @@ def _parse_and_format_args():
     whitelist = config_dict.get('whitelist')
 
     for required in ('target_directory', 'platform', 'upstream_channel'):
-        if (not getattr(args, required)) and (config_dict.get(required) is None):
+        if (not getattr(args, required)):
             raise ValueError("Missing command line argument: %s", required)
 
-    if args.pdb or (not config_dict.get('pdb') is None):
+    if args.pdb:
         # set the pdb_hook as the except hook for all exceptions
         def pdb_hook(exctype, value, traceback):
             pdb.post_mortem(traceback)
