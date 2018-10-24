@@ -220,6 +220,8 @@ def _parse_and_format_args():
     """
     parser = _make_arg_parser()
     args = parser.parse_args()
+    # parse arguments without setting defaults
+    given_args, foo = parser._parse_known_args(sys.argv[1:], argparse.Namespace())
 
     _init_logger(args.verbose)
     logger.debug('sys.argv: %s', sys.argv)
@@ -236,6 +238,19 @@ def _parse_and_format_args():
             config_dict = yaml.load(f)
         logger.info("config: %s", config_dict)
 
+        # use values from config file unless explicitly given on command line
+        for a in parser._actions:
+            if (
+                # value exists in config file
+                (a.dest in config_dict) and
+                # ignore values that can only be given on command line
+                (a.dest not in {'config', 'verbose', 'version'}) and
+                # only use config file value if the value was not explicitly given on command line
+                (not given_args.__contains__(a.dest))
+            ):
+                logger.info("Using " + a.dest + " value from config file")
+                setattr(args, a.dest, config_dict.get(a.dest))
+
     blacklist = config_dict.get('blacklist')
     whitelist = config_dict.get('whitelist')
 
@@ -250,15 +265,15 @@ def _parse_and_format_args():
         sys.excepthook = pdb_hook
 
     return {
-        'upstream_channel': args.upstream_channel or config_dict.get('upstream_channel'),
-        'target_directory': args.target_directory or config_dict.get('target_directory'),
-        'temp_directory': args.temp_directory or config_dict.get('temp_directory'),
-        'platform': args.platform or config_dict.get('platform'),
-        'num_threads': args.num_threads or config_dict.get('num_threads'),
+        'upstream_channel': args.upstream_channel,
+        'target_directory': args.target_directory,
+        'temp_directory': args.temp_directory,
+        'platform': args.platform,
+        'num_threads': args.num_threads,
         'blacklist': blacklist,
         'whitelist': whitelist,
-        'dry_run': args.dry_run or config_dict.get('dry_run'),
-        'no_validate_target': args.no_validate_target or config_dict.get('no_validate_target'),
+        'dry_run': args.dry_run,
+        'no_validate_target': args.no_validate_target,
     }
 
 
