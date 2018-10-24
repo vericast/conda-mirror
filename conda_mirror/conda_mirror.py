@@ -26,7 +26,6 @@ DEFAULT_PLATFORMS = ['linux-64',
                      'win-64',
                      'win-32']
 
-MINIMUM_FREE_SPACE_MB = 1000
 
 def _maybe_split_channel(channel):
     """Split channel if it is fully qualified.
@@ -186,6 +185,12 @@ def _make_arg_parser():
         help="Skip validation of files already present in target-directory",
         default=False,
     )
+    ap.add_argument(
+        '--minimum-free-space',
+        help=("Threshold for free diskspace. Given in megabytes."),
+        type=int,
+        default=1000,
+    )
     return ap
 
 
@@ -260,6 +265,7 @@ def _parse_and_format_args():
         'whitelist': whitelist,
         'dry_run': args.dry_run,
         'no_validate_target': args.no_validate_target,
+        'minimum_free_space': args.minimum_free_space,
     }
 
 
@@ -518,7 +524,7 @@ def _validate_or_remove_package(args):
 
 def main(upstream_channel, target_directory, temp_directory, platform,
          blacklist=None, whitelist=None, num_threads=1, dry_run=False,
-         no_validate_target=False):
+         no_validate_target=False, minimum_free_space=0):
     """
 
     Parameters
@@ -558,6 +564,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     no_validate_target : bool, optional
         Defaults to False.
         If True, skip validation of files already present in target_directory.
+    minimum_free_space : int, optional
+        Stop downloading when free space target_directory or temp_directory reach this threshold.
 
     Returns
     -------
@@ -690,24 +698,35 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # b. validate contents of temp file
     # c. move to local repo
     # mirror all new packages
+    minimum_free_space_kb = (minimum_free_space * 1024 * 1024)
     download_url, channel = _maybe_split_channel(upstream_channel)
     with tempfile.TemporaryDirectory(dir=temp_directory) as download_dir:
         logger.info('downloading to the tempdir %s', download_dir)
         for package_name in sorted(to_mirror):
-            disk = os.statvfs(download_dir)
-            if ((disk.f_bavail * disk.f_frsize) / (1024 * 1024)) < MINIMUM_FREE_SPACE_MB:
-              logger.error('Disk space below threshold in %s. Aborting download.', download_dir)
-              break
             url = download_url.format(
                 channel=channel,
                 platform=platform,
                 file_name=package_name)
             try:
-              _download(url, download_dir)
-              summary['downloaded'].add((url, download_dir))
-            except:
-              logger.error('Unexpected error: %s. Aborting download.', sys.exc_info()[0])
-              break
+                # make sure we have enough free disk space in the temp folder to meet threshold
+                if shutil.disk_usage(download_dir).free < minimum_free_space_kb:
+                    logger.error('Disk space below threshold in %s. Aborting download.',
+                                 download_dir)
+                    break
+
+                # download package
+                _download(url, download_dir)
+
+                # make sure we have enough free disk space in the target folder to meet threshold
+                if shutil.disk_usage(local_directory).free < minimum_free_space_kb:
+                    logger.error('Disk space below threshold in %s. Aborting download',
+                                 local_directory)
+                    break
+
+                summary['downloaded'].add((url, download_dir))
+            except BaseException:
+                logger.error('Unexpected error: %s. Aborting download.', sys.exc_info()[0])
+                break
 
         # validate all packages in the download directory
         validation_results = _validate_packages(packages, download_dir,
