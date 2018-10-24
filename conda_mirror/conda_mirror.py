@@ -387,7 +387,13 @@ def _download(url, target_directory):
         The url to download
     target_directory : str
         The path to a directory where `url` should be downloaded
+
+    Returns
+    -------
+    file_size: int
+        The size in bytes of the file that was downloaded
     """
+    file_size = 0
     chunk_size = 1024  # 1KB chunks
     logger.info("download_url=%s", url)
     # create a temporary file
@@ -398,6 +404,8 @@ def _download(url, target_directory):
         ret = requests.get(url, stream=True)
         for data in ret.iter_content(chunk_size):
             tf.write(data)
+        file_size = os.path.getsize(download_filename)
+    return file_size
 
 
 def _list_conda_packages(local_dir):
@@ -698,6 +706,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # b. validate contents of temp file
     # c. move to local repo
     # mirror all new packages
+    total_bytes = 0
     minimum_free_space_kb = (minimum_free_space * 1024 * 1024)
     download_url, channel = _maybe_split_channel(upstream_channel)
     with tempfile.TemporaryDirectory(dir=temp_directory) as download_dir:
@@ -715,10 +724,11 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                     break
 
                 # download package
-                _download(url, download_dir)
+                total_bytes += _download(url, download_dir)
 
                 # make sure we have enough free disk space in the target folder to meet threshold
-                if shutil.disk_usage(local_directory).free < minimum_free_space_kb:
+                # while also being able to fit the packages we have already downloaded
+                if (shutil.disk_usage(local_directory).free - total_bytes) < minimum_free_space_kb:
                     logger.error('Disk space below threshold in %s. Aborting download',
                                  local_directory)
                     break
