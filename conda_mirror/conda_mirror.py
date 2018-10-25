@@ -712,9 +712,13 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                 channel=channel,
                 platform=platform,
                 file_name=package_name)
-            _download(url, download_dir)
-            summary['downloaded'].add((url, download_dir))
-
+            try:
+                _download(url, download_dir)
+                summary['downloaded'].add((url, download_dir))
+            except Exception as ex:
+                logger.exception('Unexpected error %s: Aborting download', ex)
+                break
+                
         # validate all packages in the download directory
         validation_results = _validate_packages(packages, download_dir,
                                                 num_threads=num_threads)
