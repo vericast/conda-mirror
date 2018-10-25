@@ -735,7 +735,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
 
                 summary['downloaded'].add((url, download_dir))
             except Exception as ex:
-                logger.error('Unexpected error: %s. Aborting download.', ex)
+                logger.exception('Unexpected error: %s. Aborting download.', ex)
                 break
 
         # validate all packages in the download directory
