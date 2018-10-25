@@ -319,23 +319,27 @@ def _validate(filename, md5=None, size=None):
     reason : str
         The reason why the package is being removed
     """
-    try:
-        t = tarfile.open(filename)
-        t.extractfile('info/index.json').read().decode('utf-8')
-    except (tarfile.TarError, EOFError):
-        logger.info("Validation failed because conda package is corrupted.",
-                    exc_info=True)
-        return _remove_package(filename, reason="Tarfile read failure")
-    if size:
-        if os.stat(filename).st_size != size:
-            return _remove_package(filename, reason="Failed size test")
     if md5:
         calc = hashlib.md5(open(filename, 'rb').read()).hexdigest()
-        if calc != md5:
+        if calc == md5:
+            # If the MD5 matches, skip the other checks
+            return filename, None
+        else:
             return _remove_package(
                 filename,
                 reason="Failed md5 validation. Expected: %s. Computed: %s"
                 % (calc, md5))
+
+    if size and size != os.stat(filename).st_size:
+        return _remove_package(filename, reason="Failed size test")
+
+    try:
+        with tarfile.open(filename) as t:
+            t.extractfile('info/index.json').read().decode('utf-8')
+    except (tarfile.TarError, EOFError):
+        logger.info("Validation failed because conda package is corrupted.",
+                    exc_info=True)
+        return _remove_package(filename, reason="Tarfile read failure")
 
     return filename, None
 
