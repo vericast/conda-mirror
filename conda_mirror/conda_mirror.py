@@ -26,6 +26,7 @@ DEFAULT_PLATFORMS = ['linux-64',
                      'win-64',
                      'win-32']
 
+MINIMUM_FREE_SPACE_MB = 100
 
 def _maybe_split_channel(channel):
     """Split channel if it is fully qualified.
@@ -179,6 +180,12 @@ def _make_arg_parser():
               "validate existing packages"),
         default=False
     )
+    ap.add_argument(
+        '--no-validate-target',
+        action="store_true",
+        help="Skip validation of files already present in target-directory",
+        default=False,
+    )
     return ap
 
 
@@ -223,16 +230,6 @@ def _parse_and_format_args():
         print(__version__)
         sys.exit(1)
 
-    for required in ('target_directory', 'platform', 'upstream_channel'):
-        if not getattr(args, required):
-            raise ValueError("Missing command line argument: %s", required)
-
-    if args.pdb:
-        # set the pdb_hook as the except hook for all exceptions
-        def pdb_hook(exctype, value, traceback):
-            pdb.post_mortem(traceback)
-        sys.excepthook = pdb_hook
-
     config_dict = {}
     if args.config:
         logger.info("Loading config from %s", args.config)
@@ -240,18 +237,33 @@ def _parse_and_format_args():
             config_dict = yaml.load(f)
         logger.info("config: %s", config_dict)
 
-    blacklist = config_dict.get('blacklist')
-    whitelist = config_dict.get('whitelist')
+        if not config_dict is None:
+          for arg in config_dict.keys():
+            logger.info ("config: %s = %s", arg, config_dict.get(arg))
+
+          blacklist = config_dict.get('blacklist')
+          whitelist = config_dict.get('whitelist')
+
+    for required in ('target_directory', 'platform', 'upstream_channel'):
+        if (not getattr(args, required)) and (config_dict.get(required) is None):
+            raise ValueError("Missing command line argument: %s", required)
+
+    if args.pdb or (not config_dict.get('pdb') is None):
+        # set the pdb_hook as the except hook for all exceptions
+        def pdb_hook(exctype, value, traceback):
+            pdb.post_mortem(traceback)
+        sys.excepthook = pdb_hook
 
     return {
-        'upstream_channel': args.upstream_channel,
-        'target_directory': args.target_directory,
-        'temp_directory': args.temp_directory,
-        'platform': args.platform,
-        'num_threads': args.num_threads,
+        'upstream_channel': args.upstream_channel or config_dict.get('upstream_channel'),
+        'target_directory': args.target_directory or config_dict.get('target_directory'),
+        'temp_directory': args.temp_directory or config_dict.get('temp_directory'),
+        'platform': args.platform or config_dict.get('platform'),
+        'num_threads': args.num_threads or config_dict.get('num_threads'),
         'blacklist': blacklist,
         'whitelist': whitelist,
         'dry_run': args.dry_run,
+        'no_validate_target': args.no_validate_target,
     }
 
 
@@ -496,7 +508,7 @@ def _validate_or_remove_package(args):
         return _remove_package(package_path, reason=reason)
     # validate the integrity of the package, the size of the package and
     # its hashes
-    logger.info('Validating {:4d} of {:4d}: {}.'.format(num, num_packages,
+    logger.info('Validating {:4d} of {:4d}: {}.'.format(num + 1, num_packages,
                                                         package))
     package_path = os.path.join(package_directory, package)
     return _validate(package_path,
@@ -505,7 +517,8 @@ def _validate_or_remove_package(args):
 
 
 def main(upstream_channel, target_directory, temp_directory, platform,
-         blacklist=None, whitelist=None, num_threads=1, dry_run=False):
+         blacklist=None, whitelist=None, num_threads=1, dry_run=False,
+         no_validate_target=False):
     """
 
     Parameters
@@ -542,6 +555,9 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         Defaults to False.
         If True, skip validation and exit after determining what needs to be
         downloaded and what needs to be removed.
+    no_validate_target : bool, optional
+        Defaults to False.
+        If True, skip validation of files already present in target_directory.
 
     Returns
     -------
@@ -653,7 +669,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # construct the desired package repodata
     desired_repodata = {pkgname: packages[pkgname]
                         for pkgname in possible_packages_to_mirror}
-    if not dry_run:
+    if not (dry_run or no_validate_target):
         # Only validate if we're not doing a dry-run
         validation_results = _validate_packages(desired_repodata, local_directory, num_threads)
         summary['validating-existing'].update(validation_results)
@@ -678,6 +694,10 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     with tempfile.TemporaryDirectory(dir=temp_directory) as download_dir:
         logger.info('downloading to the tempdir %s', download_dir)
         for package_name in sorted(to_mirror):
+            disk = os.statvfs(download_dir)
+            if ((disk.f_bavail * disk.f_frsize) / (1024 * 1024)) < MINIMUM_FREE_SPACE_MB:
+              logger.error('Disk space below threshold in %s. Aborting download.', download_dir)
+              break
             url = download_url.format(
                 channel=channel,
                 platform=platform,
