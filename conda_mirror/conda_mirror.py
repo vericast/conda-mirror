@@ -262,8 +262,8 @@ def _parse_and_format_args():
         'num_threads': args.num_threads or config_dict.get('num_threads'),
         'blacklist': blacklist,
         'whitelist': whitelist,
-        'dry_run': args.dry_run or config_dict.get('dry_run'),
-        'no_validate_target': args.no_validate_target or config_dict.get('no_validate_target'),
+        'dry_run': args.dry_run,
+        'no_validate_target': args.no_validate_target,
     }
 
 
