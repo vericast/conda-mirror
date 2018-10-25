@@ -26,7 +26,6 @@ DEFAULT_PLATFORMS = ['linux-64',
                      'win-64',
                      'win-32']
 
-MINIMUM_FREE_SPACE_MB = 100
 
 def _maybe_split_channel(channel):
     """Split channel if it is fully qualified.
@@ -266,11 +265,11 @@ def _parse_and_format_args():
         sys.excepthook = pdb_hook
 
     return {
-        'upstream_channel': args.upstream_channel or config_dict.get('upstream_channel'),
-        'target_directory': args.target_directory or config_dict.get('target_directory'),
-        'temp_directory': args.temp_directory or config_dict.get('temp_directory'),
-        'platform': args.platform or config_dict.get('platform'),
-        'num_threads': args.num_threads or config_dict.get('num_threads'),
+        'upstream_channel': args.upstream_channel,
+        'target_directory': args.target_directory,
+        'temp_directory': args.temp_directory,
+        'platform': args.platform,
+        'num_threads': args.num_threads,
         'blacklist': blacklist,
         'whitelist': whitelist,
         'dry_run': args.dry_run,
@@ -523,7 +522,7 @@ def _validate_or_remove_package(args):
         return _remove_package(package_path, reason=reason)
     # validate the integrity of the package, the size of the package and
     # its hashes
-    logger.info('Validating {:4d} of {:4d}: {}.'.format(num + 1, num_packages,
+    logger.info('Validating {:4d} of {:4d}: {}.'.format(num, num_packages,
                                                         package))
     package_path = os.path.join(package_directory, package)
     return _validate(package_path,
@@ -709,20 +708,12 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     with tempfile.TemporaryDirectory(dir=temp_directory) as download_dir:
         logger.info('downloading to the tempdir %s', download_dir)
         for package_name in sorted(to_mirror):
-            disk = os.statvfs(download_dir)
-            if ((disk.f_bavail * disk.f_frsize) / (1024 * 1024)) < MINIMUM_FREE_SPACE_MB:
-              logger.error('Disk space below threshold in %s. Aborting download.', download_dir)
-              break
             url = download_url.format(
                 channel=channel,
                 platform=platform,
                 file_name=package_name)
-            try:
-                _download(url, download_dir)
-                summary['downloaded'].add((url, download_dir))
-            except Exception as ex:
-                logger.exception('Unexpected error %s: Aborting download', ex)
-                break
+            _download(url, download_dir)
+            summary['downloaded'].add((url, download_dir))
 
         # validate all packages in the download directory
         validation_results = _validate_packages(packages, download_dir,
