@@ -185,6 +185,12 @@ def _make_arg_parser():
         help="Skip validation of files already present in target-directory",
         default=False,
     )
+    ap.add_argument(
+        '--minimum-free-space',
+        help=("Threshold for free diskspace. Given in megabytes."),
+        type=int,
+        default=1000,
+    )
     return ap
 
 
@@ -259,6 +265,7 @@ def _parse_and_format_args():
         'whitelist': whitelist,
         'dry_run': args.dry_run,
         'no_validate_target': args.no_validate_target,
+        'minimum_free_space': args.minimum_free_space,
     }
 
 
@@ -380,7 +387,13 @@ def _download(url, target_directory):
         The url to download
     target_directory : str
         The path to a directory where `url` should be downloaded
+
+    Returns
+    -------
+    file_size: int
+        The size in bytes of the file that was downloaded
     """
+    file_size = 0
     chunk_size = 1024  # 1KB chunks
     logger.info("download_url=%s", url)
     # create a temporary file
@@ -391,6 +404,8 @@ def _download(url, target_directory):
         ret = requests.get(url, stream=True)
         for data in ret.iter_content(chunk_size):
             tf.write(data)
+        file_size = os.path.getsize(download_filename)
+    return file_size
 
 
 def _list_conda_packages(local_dir):
@@ -517,7 +532,7 @@ def _validate_or_remove_package(args):
 
 def main(upstream_channel, target_directory, temp_directory, platform,
          blacklist=None, whitelist=None, num_threads=1, dry_run=False,
-         no_validate_target=False):
+         no_validate_target=False, minimum_free_space=0):
     """
 
     Parameters
@@ -557,6 +572,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     no_validate_target : bool, optional
         Defaults to False.
         If True, skip validation of files already present in target_directory.
+    minimum_free_space : int, optional
+        Stop downloading when free space target_directory or temp_directory reach this threshold.
 
     Returns
     -------
@@ -689,6 +706,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     # b. validate contents of temp file
     # c. move to local repo
     # mirror all new packages
+    total_bytes = 0
+    minimum_free_space_kb = (minimum_free_space * 1024 * 1024)
     download_url, channel = _maybe_split_channel(upstream_channel)
     with tempfile.TemporaryDirectory(dir=temp_directory) as download_dir:
         logger.info('downloading to the tempdir %s', download_dir)
@@ -698,10 +717,25 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                 platform=platform,
                 file_name=package_name)
             try:
-                _download(url, download_dir)
+                # make sure we have enough free disk space in the temp folder to meet threshold
+                if shutil.disk_usage(download_dir).free < minimum_free_space_kb:
+                    logger.error('Disk space below threshold in %s. Aborting download.',
+                                 download_dir)
+                    break
+
+                # download package
+                total_bytes += _download(url, download_dir)
+
+                # make sure we have enough free disk space in the target folder to meet threshold
+                # while also being able to fit the packages we have already downloaded
+                if (shutil.disk_usage(local_directory).free - total_bytes) < minimum_free_space_kb:
+                    logger.error('Disk space below threshold in %s. Aborting download',
+                                 local_directory)
+                    break
+
                 summary['downloaded'].add((url, download_dir))
             except Exception as ex:
-                logger.exception('Unexpected error %s: Aborting download', ex)
+                logger.exception('Unexpected error: %s. Aborting download.', ex)
                 break
 
         # validate all packages in the download directory
