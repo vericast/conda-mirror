@@ -248,7 +248,7 @@ def _parse_and_format_args():
                 # only use config file value if the value was not explicitly given on command line
                 (not given_args.__contains__(a.dest))
             ):
-                logger.info("Using " + a.dest + " value from config file")
+                logger.info("Using %s value from config file", a.dest)
                 setattr(args, a.dest, config_dict.get(a.dest))
 
     blacklist = config_dict.get('blacklist')
