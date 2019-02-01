@@ -32,7 +32,7 @@ usage: conda-mirror [-h] [--upstream-channel UPSTREAM_CHANNEL]
                     [--target-directory TARGET_DIRECTORY]
                     [--temp-directory TEMP_DIRECTORY] [--platform PLATFORM]
                     [-v] [--config CONFIG] [--pdb] [--num-threads NUM_THREADS]
-                    [--version]
+                    [--version] [--dry-run]
 
 CLI interface for conda-mirror.py
 
@@ -61,6 +61,8 @@ optional arguments:
                         Num of threads for validation. 1: Serial mode. 0: All
                         available.
   --version             Print version and quit
+  --dry-run             Show what will be downloaded and what will be removed.
+                        Will not validate existing packages
 ```
 
 ## Example Usage
