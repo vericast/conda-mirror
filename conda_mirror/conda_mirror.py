@@ -479,12 +479,12 @@ def _validate_packages(package_repodata, package_directory, num_threads=1):
                           package_directory)
                          for num, package in enumerate(sorted(local_packages))]
 
-    if num_threads is 1 or num_threads is None:
+    if num_threads == 1 or num_threads is None:
         # Do serial package validation (Takes a long time for large repos)
         validation_results = map(_validate_or_remove_package,
                                  val_func_arg_list)
     else:
-        if num_threads is 0:
+        if num_threads == 0:
             num_threads = os.cpu_count()
             logger.debug('num_threads=0 so it will be replaced by all available '
                          'cores: %s' % num_threads)
