@@ -227,7 +227,7 @@ def _parse_and_format_args():
     parser = _make_arg_parser()
     args = parser.parse_args()
     # parse arguments without setting defaults
-    given_args, foo = parser._parse_known_args(sys.argv[1:], argparse.Namespace())
+    given_args, _ = parser._parse_known_args(sys.argv[1:], argparse.Namespace())
 
     _init_logger(args.verbose)
     logger.debug('sys.argv: %s', sys.argv)
@@ -252,7 +252,7 @@ def _parse_and_format_args():
                 # ignore values that can only be given on command line
                 (a.dest not in {'config', 'verbose', 'version'}) and
                 # only use config file value if the value was not explicitly given on command line
-                (not given_args.__contains__(a.dest))
+                (a.dest not in given_args)
             ):
                 logger.info("Using %s value from config file", a.dest)
                 setattr(args, a.dest, config_dict.get(a.dest))
