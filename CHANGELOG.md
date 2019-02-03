@@ -6,6 +6,7 @@
 - Check local disk space available [\#70](https://github.com/maxpoint/conda-mirror/issues/70)
 - Log download errors instead of breaking and clearing [\#71](https://github.com/maxpoint/conda-mirror/issues/71)
 - Add command line switch --no-validate-target [\#72](https://github.com/maxpoint/conda-mirror/issues/72)
+- Support most CLI options in the config file [\#74](https://github.com/maxpoint/conda-mirror/issues/74)
 - Correct numbering in output when validating [\#75](https://github.com/maxpoint/conda-mirror/issues/75)
 
 [Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.7.4...0.8.0)
