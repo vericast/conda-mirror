@@ -4,7 +4,7 @@ import versioneer
 try:
     with open('README.md') as f:
         long_description = f.read()
-except:
+except Exception:
     long_description = ''
     print('Failed to load README.md as long_description')
 
