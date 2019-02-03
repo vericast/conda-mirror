@@ -1,4 +1,4 @@
-.PHONY: help
+.PHONY: help test
 
 ENV_NAME:=conda-mirror-dev
 
