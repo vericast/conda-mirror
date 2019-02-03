@@ -227,7 +227,7 @@ def _parse_and_format_args():
     parser = _make_arg_parser()
     args = parser.parse_args()
     # parse arguments without setting defaults
-    given_args, foo = parser._parse_known_args(sys.argv[1:], argparse.Namespace())
+    given_args, _ = parser._parse_known_args(sys.argv[1:], argparse.Namespace())
 
     _init_logger(args.verbose)
     logger.debug('sys.argv: %s', sys.argv)
@@ -252,7 +252,7 @@ def _parse_and_format_args():
                 # ignore values that can only be given on command line
                 (a.dest not in {'config', 'verbose', 'version'}) and
                 # only use config file value if the value was not explicitly given on command line
-                (not given_args.__contains__(a.dest))
+                (a.dest not in given_args)
             ):
                 logger.info("Using %s value from config file", a.dest)
                 setattr(args, a.dest, config_dict.get(a.dest))
@@ -479,12 +479,12 @@ def _validate_packages(package_repodata, package_directory, num_threads=1):
                           package_directory)
                          for num, package in enumerate(sorted(local_packages))]
 
-    if num_threads is 1 or num_threads is None:
+    if num_threads == 1 or num_threads is None:
         # Do serial package validation (Takes a long time for large repos)
         validation_results = map(_validate_or_remove_package,
                                  val_func_arg_list)
     else:
-        if num_threads is 0:
+        if num_threads == 0:
             num_threads = os.cpu_count()
             logger.debug('num_threads=0 so it will be replaced by all available '
                          'cores: %s' % num_threads)

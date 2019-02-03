@@ -6,7 +6,7 @@ python:
 - 3.6
 
 install:
-- pip install -r test-requirements.txt
+- pip install -r requirements-test.txt
 - pip install codecov
 - pip install -e .
 

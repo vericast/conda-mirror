@@ -1,5 +1,16 @@
 # Change Log
 
+## [0.8.0](https://github.com/maxpoint/conda-mirror/tree/0.8.0)
+
+- Improve validation performance [\#69](https://github.com/maxpoint/conda-mirror/issues/69)
+- Check local disk space available [\#70](https://github.com/maxpoint/conda-mirror/issues/70)
+- Log download errors instead of breaking and clearing [\#71](https://github.com/maxpoint/conda-mirror/issues/71)
+- Add command line switch --no-validate-target [\#72](https://github.com/maxpoint/conda-mirror/issues/72)
+- Support most CLI options in the config file [\#74](https://github.com/maxpoint/conda-mirror/issues/74)
+- Correct numbering in output when validating [\#75](https://github.com/maxpoint/conda-mirror/issues/75)
+
+[Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.7.4...0.8.0)
+
 ## [0.7.4](https://github.com/maxpoint/conda-mirror/tree/0.7.4)
 
 [Full Changelog](https://github.com/maxpoint/conda-mirror/compare/0.7.3...0.7.4)
@@ -17,7 +28,7 @@
 
 **Fixed bugs:**
 
-- keep old packages [\#56](https://github.com/maxpoint/conda-mirror/issues/56)
+- Keep old packages [\#56](https://github.com/maxpoint/conda-mirror/issues/56)
 
 **Closed issues:**
 
