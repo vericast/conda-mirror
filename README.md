@@ -52,7 +52,7 @@ optional arguments:
                         default temp directory has less available space than
                         your mirroring target
   --platform PLATFORM   The OS platform(s) to mirror. one of: {'linux-64',
-                        'linux-32','osx-64', 'win-32', 'win-64'}
+                        'linux-32','osx-64', 'win-32', 'win-64', 'noarch'}
   -v, --verbose         logging defaults to error/exception only. Takes up to
                         three '-v' flags. '-v': warning. '-vv': info. '-vvv':
                         debug.
