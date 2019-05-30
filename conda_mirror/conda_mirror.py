@@ -105,6 +105,16 @@ def _match(all_packages, key_glob_dict):
     return matched
 
 
+def _str_or_false(x):
+    """
+    Returns a boolean False if x is the string "False" or similar.
+    Returns the original string otherwise.
+    """
+    if x.lower() == "false":
+        x = False
+    return x
+
+
 def _make_arg_parser():
     """
     Localize the ArgumentParser logic
@@ -198,10 +208,20 @@ def _make_arg_parser():
         default=None,
     )
     ap.add_argument(
-        '--ssl_verify',
-        help=('Path to a CA_BUNDLE file with certificates of trusted CAs'),
-        type=str,
+        '--ssl-verify', '--ssl_verify',
+        help=('Path to a CA_BUNDLE file with certificates of trusted CAs, '
+              'this may be "False" to disable verification as per the '
+              'requests API.'),
+        type=_str_or_false,
         default=None,
+        dest='ssl_verify',
+    )
+    ap.add_argument(
+        '-k', '--insecure',
+        help=('Allow conda to perform "insecure" SSL connections and '
+              "transfers. Equivalent to setting 'ssl_verify' to 'false'."),
+        action="store_false",
+        dest="ssl_verify",
     )
     return ap
 
@@ -401,7 +421,7 @@ def get_repodata(channel, platform, proxies=None, ssl_verify=None):
         The platform of interest
     proxies : dict
         Proxys for connecting internet
-    ssl_verify : str
+    ssl_verify : str or bool
         Path to a CA_BUNDLE file or directory with certificates of trusted CAs
 
     Returns
@@ -437,7 +457,7 @@ def _download(url, target_directory, proxies=None, ssl_verify=None):
         The path to a directory where `url` should be downloaded
     proxies : dict
         Proxys for connecting internet
-    ssl_verify : str
+    ssl_verify : str or bool
         Path to a CA_BUNDLE file or directory with certificates of trusted CAs
 
     Returns
@@ -630,7 +650,7 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         Stop downloading when free space target_directory or temp_directory reach this threshold.
     proxies : dict
         Proxys for connecting internet
-    ssl_verify : str
+    ssl_verify : str or bool
         Path to a CA_BUNDLE file or directory with certificates of trusted CAs
 
     Returns
