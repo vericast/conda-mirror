@@ -105,6 +105,16 @@ def _match(all_packages, key_glob_dict):
     return matched
 
 
+def _str_or_false(x):
+    """
+    Returns a boolean False if x is the string "False" or similar.
+    Returns the original string otherwise.
+    """
+    if x.lower() == "false":
+        x = False
+    return x
+
+
 def _make_arg_parser():
     """
     Localize the ArgumentParser logic
@@ -191,6 +201,28 @@ def _make_arg_parser():
         type=int,
         default=1000,
     )
+    ap.add_argument(
+        '--proxy',
+        help=('Proxy URL to access internet if needed'),
+        type=str,
+        default=None,
+    )
+    ap.add_argument(
+        '--ssl-verify', '--ssl_verify',
+        help=('Path to a CA_BUNDLE file with certificates of trusted CAs, '
+              'this may be "False" to disable verification as per the '
+              'requests API.'),
+        type=_str_or_false,
+        default=None,
+        dest='ssl_verify',
+    )
+    ap.add_argument(
+        '-k', '--insecure',
+        help=('Allow conda to perform "insecure" SSL connections and '
+              "transfers. Equivalent to setting 'ssl_verify' to 'false'."),
+        action="store_false",
+        dest="ssl_verify",
+    )
     return ap
 
 
@@ -270,6 +302,21 @@ def _parse_and_format_args():
             pdb.post_mortem(traceback)
         sys.excepthook = pdb_hook
 
+    proxies = args.proxy
+    if proxies is not None:
+        # use scheme of proxy url to generate dictionary
+        # if no extra scheme is given
+        # examples:
+        # "http:https://user:pass@proxy.tld"
+        #  -> {'http': 'https://user:pass@proxy.tld'}
+        # "https://user:pass@proxy.tld"
+        #  -> {'https': 'https://user:pass@proxy.tld'}
+        scheme, *url = proxies.split(':')
+        if len(url) > 1:
+            url = ':'.join(url)
+        else:
+            url = '{}:{}'.format(scheme, url[0])
+        proxies = {scheme: url}
     return {
         'upstream_channel': args.upstream_channel,
         'target_directory': args.target_directory,
@@ -281,6 +328,8 @@ def _parse_and_format_args():
         'dry_run': args.dry_run,
         'no_validate_target': args.no_validate_target,
         'minimum_free_space': args.minimum_free_space,
+        'proxies': proxies,
+        'ssl_verify': args.ssl_verify,
     }
 
 
@@ -361,7 +410,7 @@ def _validate(filename, md5=None, size=None):
     return filename, None
 
 
-def get_repodata(channel, platform):
+def get_repodata(channel, platform, proxies=None, ssl_verify=None):
     """Get the repodata.json file for a channel/platform combo on anaconda.org
 
     Parameters
@@ -370,6 +419,10 @@ def get_repodata(channel, platform):
         anaconda.org/CHANNEL
     platform : {'linux-64', 'linux-32', 'osx-64', 'win-32', 'win-64'}
         The platform of interest
+    proxies : dict
+        Proxys for connecting internet
+    ssl_verify : str or bool
+        Path to a CA_BUNDLE file or directory with certificates of trusted CAs
 
     Returns
     -------
@@ -381,7 +434,7 @@ def get_repodata(channel, platform):
     url = url_template.format(channel=channel, platform=platform,
                               file_name='repodata.json')
 
-    resp = requests.get(url).json()
+    resp = requests.get(url, proxies=proxies, verify=ssl_verify).json()
     info = resp.get('info', {})
     packages = resp.get('packages', {})
     # Patch the repodata.json so that all package info dicts contain a "subdir"
@@ -393,7 +446,7 @@ def get_repodata(channel, platform):
     return info, packages
 
 
-def _download(url, target_directory):
+def _download(url, target_directory, proxies=None, ssl_verify=None):
     """Download `url` to `target_directory`
 
     Parameters
@@ -402,6 +455,10 @@ def _download(url, target_directory):
         The url to download
     target_directory : str
         The path to a directory where `url` should be downloaded
+    proxies : dict
+        Proxys for connecting internet
+    ssl_verify : str or bool
+        Path to a CA_BUNDLE file or directory with certificates of trusted CAs
 
     Returns
     -------
@@ -416,7 +473,8 @@ def _download(url, target_directory):
     download_filename = os.path.join(target_directory, target_filename)
     logger.debug('downloading to %s', download_filename)
     with open(download_filename, 'w+b') as tf:
-        ret = requests.get(url, stream=True)
+        ret = requests.get(url, stream=True,
+                           proxies=proxies, verify=ssl_verify)
         for data in ret.iter_content(chunk_size):
             tf.write(data)
         file_size = os.path.getsize(download_filename)
@@ -547,7 +605,8 @@ def _validate_or_remove_package(args):
 
 def main(upstream_channel, target_directory, temp_directory, platform,
          blacklist=None, whitelist=None, num_threads=1, dry_run=False,
-         no_validate_target=False, minimum_free_space=0):
+         no_validate_target=False, minimum_free_space=0, proxies=None,
+         ssl_verify=None):
     """
 
     Parameters
@@ -589,6 +648,10 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         If True, skip validation of files already present in target_directory.
     minimum_free_space : int, optional
         Stop downloading when free space target_directory or temp_directory reach this threshold.
+    proxies : dict
+        Proxys for connecting internet
+    ssl_verify : str or bool
+        Path to a CA_BUNDLE file or directory with certificates of trusted CAs
 
     Returns
     -------
@@ -649,7 +712,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
     if not os.path.exists(os.path.join(target_directory, platform)):
         os.makedirs(os.path.join(target_directory, platform))
 
-    info, packages = get_repodata(upstream_channel, platform)
+    info, packages = get_repodata(upstream_channel, platform,
+                                  proxies=proxies, ssl_verify=ssl_verify)
     local_directory = os.path.join(target_directory, platform)
 
     # 1. validate local repo
@@ -739,7 +803,8 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                     break
 
                 # download package
-                total_bytes += _download(url, download_dir)
+                total_bytes += _download(url, download_dir, proxies=proxies,
+                                         ssl_verify=ssl_verify)
 
                 # make sure we have enough free disk space in the target folder to meet threshold
                 # while also being able to fit the packages we have already downloaded
