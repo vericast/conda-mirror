@@ -33,7 +33,8 @@ usage: conda-mirror [-h] [--upstream-channel UPSTREAM_CHANNEL]
                     [--temp-directory TEMP_DIRECTORY] [--platform PLATFORM]
                     [-v] [--config CONFIG] [--pdb] [--num-threads NUM_THREADS]
                     [--version] [--dry-run] [--no-validate-target]
-                    [--minimum-free-space MINIMUM_FREE_SPACE]
+                    [--minimum-free-space MINIMUM_FREE_SPACE] [--proxy PROXY]
+                    [--ssl-verify SSL_VERIFY] [-k] [--max-retries MAX_RETRIES]
 
 CLI interface for conda-mirror.py
 
@@ -68,6 +69,17 @@ optional arguments:
                         directory
   --minimum-free-space MINIMUM_FREE_SPACE
                         Threshold for free diskspace. Given in megabytes.
+  --proxy PROXY         Proxy URL to access internet if needed
+  --ssl-verify SSL_VERIFY, --ssl_verify SSL_VERIFY
+                        Path to a CA_BUNDLE file with certificates of trusted
+                        CAs, this may be "False" to disable verification as
+                        per the requests API.
+  -k, --insecure        Allow conda to perform "insecure" SSL connections and
+                        transfers. Equivalent to setting 'ssl_verify' to
+                        'false'.
+  --max-retries MAX_RETRIES
+                        Maximum number of retries before a download error is
+                        reraised, defaults to 100
 ```
 
 ## Example Usage
