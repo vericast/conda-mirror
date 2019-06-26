@@ -34,7 +34,7 @@ usage: conda-mirror [-h] [--upstream-channel UPSTREAM_CHANNEL]
                     [-v] [--config CONFIG] [--pdb] [--num-threads NUM_THREADS]
                     [--version] [--dry-run] [--no-validate-target]
                     [--minimum-free-space MINIMUM_FREE_SPACE] [--proxy PROXY]
-                    [--ssl-verify SSL_VERIFY] [-k]
+                    [--ssl-verify SSL_VERIFY] [-k] [--max-retries MAX_RETRIES]
 
 CLI interface for conda-mirror.py
 
@@ -77,6 +77,9 @@ optional arguments:
   -k, --insecure        Allow conda to perform "insecure" SSL connections and
                         transfers. Equivalent to setting 'ssl_verify' to
                         'false'.
+  --max-retries MAX_RETRIES
+                        Maximum number of retries before a download error is
+                        reraised, defaults to 100
 ```
 
 ## Example Usage
