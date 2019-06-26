@@ -11,6 +11,8 @@ import shutil
 import sys
 import tarfile
 import tempfile
+import time
+import random
 from pprint import pformat
 
 import requests
@@ -223,6 +225,14 @@ def _make_arg_parser():
         action="store_false",
         dest="ssl_verify",
     )
+    ap.add_argument(
+        '--max-retries',
+        help=('Maximum  number of retries before a download error is reraised, '
+              "defaults to 100"),
+        type=int,
+        default=100,
+        dest="max_retries",
+    )
     return ap
 
 
@@ -330,6 +340,7 @@ def _parse_and_format_args():
         'minimum_free_space': args.minimum_free_space,
         'proxies': proxies,
         'ssl_verify': args.ssl_verify,
+        'max_retries': args.max_retries,
     }
 
 
@@ -481,6 +492,47 @@ def _download(url, target_directory, proxies=None, ssl_verify=None):
     return file_size
 
 
+def _download_backoff_retry(url, target_directory, proxies=None, ssl_verify=None, max_retries=100):
+    """Download `url` to `target_directory` with exponential backoff in the
+    event of failure.
+
+    Parameters
+    ----------
+    url : str
+        The url to download
+    target_directory : str
+        The path to a directory where `url` should be downloaded
+    proxies : dict
+        Proxys for connecting internet
+    ssl_verify : str or bool
+        Path to a CA_BUNDLE file or directory with certificates of trusted CAs
+    max_retries : int, optional
+        The maximum number of times to retry before the download error is reraised,
+        default 100.
+
+    Returns
+    -------
+    file_size: int
+        The size in bytes of the file that was downloaded
+    """
+    c = 0
+    two_c = 1
+    delay = 5.12e-5  # 51.2 us
+    while c < max_retries:
+        c += 1
+        two_c *= 2
+        try:
+            rtn = _download(url, target_directory, proxies=proxies, ssl_verify=ssl_verify)
+            break
+        except Exception:
+            if c < max_retries:
+                logger.debug('downloading failed, retrying {0}/{1}'.format(c, max_retries))
+                time.sleep(delay * random.randint(0, two_c - 1))
+            else:
+                raise
+    return rtn
+
+
 def _list_conda_packages(local_dir):
     """List the conda packages (*.tar.bz2 files) in `local_dir`
 
@@ -606,7 +658,7 @@ def _validate_or_remove_package(args):
 def main(upstream_channel, target_directory, temp_directory, platform,
          blacklist=None, whitelist=None, num_threads=1, dry_run=False,
          no_validate_target=False, minimum_free_space=0, proxies=None,
-         ssl_verify=None):
+         ssl_verify=None, max_retries=100):
     """
 
     Parameters
@@ -652,6 +704,9 @@ def main(upstream_channel, target_directory, temp_directory, platform,
         Proxys for connecting internet
     ssl_verify : str or bool
         Path to a CA_BUNDLE file or directory with certificates of trusted CAs
+    max_retries : int, optional
+        The maximum number of times to retry before the download error is reraised,
+        default 100.
 
     Returns
     -------
@@ -803,8 +858,10 @@ def main(upstream_channel, target_directory, temp_directory, platform,
                     break
 
                 # download package
-                total_bytes += _download(url, download_dir, proxies=proxies,
-                                         ssl_verify=ssl_verify)
+                total_bytes += _download_backoff_retry(url, download_dir,
+                                                       proxies=proxies,
+                                                       ssl_verify=ssl_verify,
+                                                       max_retries=max_retries)
 
                 # make sure we have enough free disk space in the target folder to meet threshold
                 # while also being able to fit the packages we have already downloaded
